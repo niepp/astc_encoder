@@ -324,23 +324,44 @@ int main()
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pCubeTexture->GetDesc(&TexDesc);
 
-	// unordered access view on back buffer
-	ID3D11Texture2D*        pBackBuffer = nullptr;
+	// unordered access view on new tex2d buffer
 	ID3D11UnorderedAccessView* pTexUAV = nullptr;
-	hr = pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+
+	D3D11_TEXTURE2D_DESC desc;
+	D3D11_TEXTURE2D_DESC textureDesc;
+	ZeroMemory(&textureDesc, sizeof(textureDesc));
+	textureDesc.Width = TexDesc.Width;
+	textureDesc.Height = TexDesc.Height;
+	textureDesc.MipLevels = 1;
+	textureDesc.ArraySize = 1;
+	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	textureDesc.SampleDesc.Count = 1;
+	textureDesc.SampleDesc.Quality = 0;
+	textureDesc.Usage = D3D11_USAGE_DEFAULT;
+	textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+	textureDesc.CPUAccessFlags = 0;
+	textureDesc.MiscFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitialData;
+	InitialData.pSysMem = new unsigned char[TexDesc.Width * TexDesc.Height * 4];
+	InitialData.SysMemPitch = 2048;
+	InitialData.SysMemSlicePitch = TexDesc.Width * TexDesc.Height * 4;
+
+	ID3D11Texture2D *pOutTex = nullptr;
+	pd3dDevice->CreateTexture2D(&textureDesc, &InitialData, &pOutTex);
+
+	D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV;
+	ZeroMemory(&descUAV, sizeof(descUAV));
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+	descUAV.Texture2D.MipSlice = 0;
+
+	hr = pd3dDevice->CreateUnorderedAccessView(pOutTex, &descUAV, (ID3D11UnorderedAccessView**)&pTexUAV);
 	if (FAILED(hr))
 	{
 		return hr;
 	}
 
-	D3D11_TEXTURE2D_DESC backBufferDesc;
-	pBackBuffer->GetDesc(&backBufferDesc);
-
-	hr = pd3dDevice->CreateUnorderedAccessView((ID3D11Texture2D*)pBackBuffer, nullptr, (ID3D11UnorderedAccessView**)&pTexUAV);
-	if (FAILED(hr))
-	{
-		return hr;
-	}
 
 	// unordered access view for output astc buf
 	D3D11_BUFFER_DESC sbOutDesc;
