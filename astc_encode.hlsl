@@ -3,7 +3,7 @@
     "RootFlags(0), " \
     "RootConstants(b0, num32BitConstants = 4), " \
     "DescriptorTable(SRV(t0, numDescriptors = 1))," \
-    "DescriptorTable(UAV(u0, numDescriptors = 2))"
+    "DescriptorTable(UAV(u0, numDescriptors = 1))"
 
 cbuffer TexInfo : register(b0)
 {
@@ -14,8 +14,7 @@ cbuffer TexInfo : register(b0)
 }
 
 Texture2D g_SrcTex 			: register(t0);
-RWTexture2D<float4> g_DstTex  		: register(u0);
-RWStructuredBuffer<uint4> g_DstBuf  : register(u1);
+RWStructuredBuffer<uint4> g_DstBuf  : register(u0);
 
 #define THREAD_NUM_X 8
 #define THREAD_NUM_Y 8
@@ -502,17 +501,6 @@ void main(
 
 	uint blockID = blockPos.y * xGroupNum * THREAD_NUM_X + blockPos.x;
 	g_DstBuf[blockID] = phy_blk;
-
-	// draw to backbuffer
-	for (i = 0; i < BLOCK_SIZE; ++i)
-	{
-		uint y = i / BLOCK_SIZE_X;
-		uint x = i - y * BLOCK_SIZE_X;
-		uint2 localPos = uint2(x, y);
-		float2 pixel_coord = blockPos * blockSize + localPos;
-		pixel_coord.y = TexelHeight - 1 - pixel_coord.y;
-		g_DstTex[pixel_coord] = texels[i] / 255.0;
-	}
 
 }
 

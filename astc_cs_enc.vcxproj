@@ -113,11 +113,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="DDSTextureLoader.h" />
+    <ClInclude Include="encode_astc.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="timer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cs_astc.cpp" />
-    <ClCompile Include="DDSTextureLoader.cpp" />
+    <ClCompile Include="timer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
