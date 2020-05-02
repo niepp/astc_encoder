@@ -1,5 +1,4 @@
-#define WIDTH 1280
-#define HEIGHT 800
+#pragma once
 
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x600

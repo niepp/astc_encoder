@@ -114,6 +114,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="encode_astc.h" />
+    <ClInclude Include="save_astc.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="timer.h" />
   </ItemGroup>

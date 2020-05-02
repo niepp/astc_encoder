@@ -18,6 +18,7 @@
 #include "stb_image.h"
 #include "timer.h"
 #include "encode_astc.h"
+#include "save_astc.h"
 
 typedef struct _constantBufferStruct
 {
@@ -613,21 +614,32 @@ int main()
 
 	// shader resource view
 	ID3D11Texture2D* pCubeTexture = load_tex(pd3dDevice, "F:/work_astc/astc_cs/fruit.tga");
-	
+
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pCubeTexture->GetDesc(&TexDesc);
 
 	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pCubeTexture);
+	
+	// save to file
+	uint32_t bufLen = 16 * ((TexDesc.Height + cBlockDimY - 1) / cBlockDimY) * ((TexDesc.Width + cBlockDimX - 1) / cBlockDimX);
+	uint8_t* pMemBuf = new uint8_t[bufLen];
+	ZeroMemory(pMemBuf, bufLen);
+	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+
+	save_astc("F:/work_astc/ASTC_preview/Assets/Resources/fruit_cs.astc", cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
+
+
+	// ID3D11Buffer 不经过cpu直接到ID3D11Texture2D 如何搞？实在不行就先拷贝到cpu再 传到gpu上创建gpu上的astc压缩纹理
 
 
 	ID3D11Texture2D* pDstTex = nullptr;
 
 	D3D11_TEXTURE2D_DESC ASTC_Desc;
-	ASTC_Desc.Width = xsize;		// grid size of the waves, rows
-	ASTC_Desc.Height = ysize;		// grid size of the waves, colums
+	ASTC_Desc.Width = TexDesc.Width;		// grid size of the waves, rows
+	ASTC_Desc.Height = TexDesc.Height;		// grid size of the waves, colums
 	ASTC_Desc.MipLevels = 1;
 	ASTC_Desc.ArraySize = 1;
-	ASTC_Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	ASTC_Desc.Format = DXGI_FORMAT_BC7_UNORM_SRGB;
 	ASTC_Desc.SampleDesc.Count = 1;
 	ASTC_Desc.SampleDesc.Quality = 0;
 	ASTC_Desc.Usage = D3D11_USAGE_DEFAULT;
@@ -636,12 +648,11 @@ int main()
 	ASTC_Desc.MiscFlags = 0;
 
 	D3D11_SUBRESOURCE_DATA ASTC_InitData;
-	ASTC_InitData.pSysMem = new unsigned char[];
-	ASTC_InitData.SysMemPitch = xsize * 4;
-	ASTC_InitData.SysMemSlicePitch = xsize * ysize * 4;
+	ASTC_InitData.pSysMem = new unsigned char[TexDesc.Width * TexDesc.Height * 4];
+	ASTC_InitData.SysMemPitch = TexDesc.Width * 4;
+	ASTC_InitData.SysMemSlicePitch = TexDesc.Width * TexDesc.Height * 4;
 
-
-	hr = pd3dDevice->CreateTexture2D(&TexDesc, &ASTC_InitData, &pDstTex);
+	hr = pd3dDevice->CreateTexture2D(&TexDesc, nullptr, &pDstTex);
 	if (FAILED(hr))
 	{
 		return hr;
