@@ -236,33 +236,21 @@ uint encode_block_mode(uint xdim, uint ydim, out uint x_grids, out uint y_grids,
 }
 
 
-uint quantize_color(uint quant, uint c)
-{
-	//astc_assert(c >= 0 && c <= 255);
-	return color_quantize_table[quant][c];
-}
-
 uint3 quantize_color(uint quant, uint3 c)
 {
 	uint3 result;
-	result.r = color_quantize_table[quant][c.r];
-	result.g = color_quantize_table[quant][c.g];
-	result.b = color_quantize_table[quant][c.b];
+	result.r = color_quantize_table[c.r];
+	result.g = color_quantize_table[c.g];
+	result.b = color_quantize_table[c.b];
 	return result;
-}
-
-uint unquantize_color(uint quant, uint c)
-{
-	//astc_assert(c >= 0 && c <= 255);
-	return color_unquantize_table[quant][c];
 }
 
 uint3 unquantize_color(uint quant, uint3 c)
 {
 	uint3 result;
-	result.r = color_unquantize_table[quant][c.r];
-	result.g = color_unquantize_table[quant][c.g];
-	result.b = color_unquantize_table[quant][c.b];
+	result.r = color_unquantize_table[c.r];
+	result.g = color_unquantize_table[c.g];
+	result.b = color_unquantize_table[c.b];
 	return result;
 }
 
@@ -406,17 +394,11 @@ uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1
 	// todo
 	uint color_endpoint_mode = CEM_LDR_RGB_DIRECT;
 
-	uint x_grids = 0;
-	uint y_grids = 0;
-	uint weight_quantmethod;
+	uint x_grids = BLOCK_SIZE_X;
+	uint y_grids = BLOCK_SIZE_Y;
+	uint weight_quantmethod = 5;
 
-	uint block_mode = encode_block_mode(BLOCK_SIZE_X, BLOCK_SIZE_Y, x_grids, y_grids, weight_quantmethod);
-
-	// weight_quantmethod = 5;
-
-	// todo
-	x_grids = BLOCK_SIZE_X;
-	y_grids = BLOCK_SIZE_Y;
+	uint block_mode = 19; //encode_block_mode(BLOCK_SIZE_X, BLOCK_SIZE_Y, x_grids, y_grids, weight_quantmethod);
 
 	uint weights_count = x_grids * y_grids;
 	uint endpoints_quantmethod = QUANT_256;

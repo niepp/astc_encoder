@@ -3,7 +3,7 @@ uint quantize_weight(uint weight_quant, uint weight)
 {
 	//astc_assert(weight_quant <= QUANT_32);
 	//astc_assert(weight <= 1024);
-	return weight_quantize_table[weight_quant][weight];
+	return weight_quantize_table[weight];
 }
 
 /**
