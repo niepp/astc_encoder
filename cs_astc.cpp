@@ -17,7 +17,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "stb_image.h"
-#include "timer.h"
 #include "encode_astc.h"
 #include "save_astc.h"
 
