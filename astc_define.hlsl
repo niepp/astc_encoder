@@ -17,6 +17,8 @@
 #define MAX_ENCODED_WEIGHT_BYTES 12
 #define MAX_ENCODED_COLOR_ENDPOINT_BYTES 12
 
+#define COLOR_EQUAL_EPSILON 50
+
 /*
 * color_endpoint_mode_t
 */

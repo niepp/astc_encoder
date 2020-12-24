@@ -110,6 +110,31 @@ void compute_dominant_direction_pca(uint4 texels[BLOCK_SIZE], uint count, out fl
 }
 
 
+uint equal_approx(uint4 ta, uint4 tb)
+{
+	int3 vd = ta.xyz - tb.xyz;
+	return step(dot(vd, vd), COLOR_EQUAL_EPSILON);
+}
+
+uint4 encode_constant_block(uint4 texels[BLOCK_SIZE])
+{
+	uint4 color = 0;
+	for (uint i = 0; i < BLOCK_SIZE; ++i)
+	{
+		color += texels[i];
+	}
+	// calculate average color
+	color = (color + BLOCK_SIZE / 2) / BLOCK_SIZE;
+
+	uint4 bcode = 0;
+	bcode.x = 0xFCFDFFFF;
+	bcode.y = 0xFFFFFFFF;
+	bcode.z = (color.x << 16) | (color.y);
+	bcode.w = (color.z << 16) | (color.w);
+	return bcode;
+}
+
+
 // return 0 on invalid mode, 1 on valid mode.
 uint decode_block_mode_2d(uint blockmode, uint xdim, uint ydim, out uint Nval, out uint Mval, out uint dual_weight_plane, out uint quant_mode)
 {
@@ -409,6 +434,15 @@ uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1
 	uint endpoint_quantized[6];
 	int3 ie0 = round(e0);
 	int3 ie1 = round(e1);
+
+
+	uint3 de = ie0 - ie1;
+	uint d = dot(de, de);
+	if (d < 50)
+	{
+		return encode_constant_block(texels);
+	}
+
 	encode_rgb_direct(endpoints_quantmethod, ie0, ie1, endpoint_quantized);	
 
 	// 插值权重量化
@@ -445,10 +479,19 @@ uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1
 
 uint4 compress(uint4 texels[BLOCK_SIZE])
 {
+	//uint sum = 0;
+	//for (uint i = 0; i < BLOCK_SIZE; ++i)
+	//{
+	//	sum += equal_approx(texels[i], texels[0]);
+	//}
+
+	//if (sum == BLOCK_SIZE)
+	//{
+	//	return encode_constant_block(texels);
+	//}
+
 	float3 e0, e1;
 	compute_dominant_direction_pca(texels, BLOCK_SIZE, e0, e1);
-
-		
 	return encode_rgb_single_partition(texels, e0, e1);
 }
 
