@@ -1,18 +1,20 @@
 
-// È¡µÚn¸öbitÎ»µÄÖµ
+// å–ç¬¬nä¸ªbitä½çš„å€¼
 uint getbit(uint number, uint n)
 {
 	return (number >> n) & 1;
 }
 
-// È¡µÚlsbµ½msbµÄÕâ¼¸¸öbitÎ»µÄÖµ
+// å–ç¬¬lsbåˆ°msbçš„è¿™å‡ ä¸ªbitä½çš„å€¼
 uint getbits(uint number, uint msb, uint lsb)
 {
 	uint count = msb - lsb + 1;
 	return (number >> lsb) & ((1 << count) - 1);
 }
 
-// °ÑnumberµÄµÍbitcountÎ»Ğ´µ½bytesµÄbitoffsetÆ«ÒÆ´¦¿ªÊ¼µÄÎ»ÖÃ
+// this is bad: Compiler failed with XPC_ERROR_CONNECTION_INTERRUPTED
+
+// æŠŠnumberçš„ä½bitcountä½å†™åˆ°bytesçš„bitoffsetåç§»å¤„å¼€å§‹çš„ä½ç½®
 // number must be <= 255; bitcount must be <= 8
 uint4 orbits8_ptr(uint4 bytes, uint bitoffset, uint number, uint bitcount)
 {
@@ -53,10 +55,9 @@ uint4 orbits8_ptr(uint4 bytes, uint bitoffset, uint number, uint bitcount)
 
 	return retv;
 }
-
 void split_high_low(uint n, uint i, out uint high, out uint low)
 {
-	uint low_mask = ((1 << i) - 1) & 0xFF;
+	uint low_mask = (uint)((1 << i) - 1) & 0xFF;
 	low = n & low_mask;
 	high = (n >> i) & 0xFF;
 }
@@ -247,6 +248,7 @@ void integer_sequence_encode(uint numbers[ISE_BYTE_COUNT], uint count, uint rang
 	uint bits = bits_trits_quints_table[range][0];
 	uint trits = bits_trits_quints_table[range][1];
 	uint quints = bits_trits_quints_table[range][2];
+
 	if (trits == 1)
 	{
 		encode_by_trits(numbers, count, bits, outputs, bitpos);

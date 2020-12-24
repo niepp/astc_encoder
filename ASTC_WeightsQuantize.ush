@@ -72,49 +72,6 @@ void calculate_quantized_weights_rgb(uint4 texels[BLOCK_SIZE],
 	{
 		int3 k = e1 - e0;
 		int3 m = e0;
-
-		float x_step = 1.0f * BLOCK_SIZE_X / x_grids;
-		float y_step = 1.0f * BLOCK_SIZE_Y / y_grids;
-
-		//for (uint i = 0; i < x_grids; ++i)
-		//{
-		//	for (uint j = 0; j < y_grids; ++j)
-		//	{
-		//		float x_start = i * x_step;
-		//		float x_end = (i + 1) * x_step;
-		//		uint x_start_idx = (uint)(x_start);
-		//		uint x_end_idx = (uint)(x_end);
-
-		//		float y_start = j * y_step;
-		//		float y_end = (j + 1) * y_step;
-		//		uint y_start_idx = (uint)(y_start);
-		//		uint y_end_idx = (uint)(y_end);
-
-		//		float sum_w = 0;
-		//		float wx = 0;
-		//		float wy = 0;
-		//		float3 sum_tex = {0, 0, 0};
-
-		//		for (uint bx = x_start_idx; bx <= x_end_idx; ++bx)
-		//		{
-		//			for (uint by = y_start_idx; by <= y_end_idx; ++by)
-		//			{
-		//				wx = clamp(get_bilinear_weight(bx, x_start, x_end), 0, 1.0);
-		//				wy = clamp(get_bilinear_weight(by, y_start, y_end), 0, 1.0);
-		//				sum_w += wx * wy;
-
-		//				uint bidx = bx + by * BLOCK_SIZE_X;
-		//				sum_tex = sum_tex + to_float3(texels[bidx].xyz) * wx * wy;
-		//			}
-		//		}
-
-		//		sum_tex = sum_tex / sum_w;
-		//		//weights[i + j * x_grids] = quantize_weight(quant, project(k, m, to_int3(sum_tex)));
-
-		//		weights[i + j * x_grids] = quantize_weight(quant, project(k, m, texels[i + j * x_grids].xyz));
-		//	}
-		//}
-
 		for (uint i = 0; i < BLOCK_SIZE; ++i)
 		{
 			weights[i] = quantize_weight(quant, project(k, m, texels[i].xyz));

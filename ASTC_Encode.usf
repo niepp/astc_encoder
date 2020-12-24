@@ -1,28 +1,21 @@
 
-#define RootSig \
-    "RootFlags(0), " \
-    "RootConstants(b0, num32BitConstants = 4), " \
-    "DescriptorTable(SRV(t0, numDescriptors = 1))," \
-    "DescriptorTable(UAV(u0, numDescriptors = 1))"
 
-cbuffer TexInfo : register(b0)
-{
-	int TexelWidth;
-	int TexelHeight;
-	int xGroupNum;
-	int yGroupNum;
-}
+int InTexelHeight;
+int InGroupNumX;
 
-Texture2D g_SrcTex 			: register(t0);
-RWStructuredBuffer<uint4> g_DstBuf  : register(u0);
+Texture2D InTexture;
+RWStructuredBuffer<uint4> OutBuffer;
 
 #define THREAD_NUM_X 8
 #define THREAD_NUM_Y 8
 
-#include "astc_define.hlsl"
-#include "astc_table.hlsl"
-#include "astc_weights_quantize.hlsl"
-#include "astc_integer_sequence_encoding.hlsl"
+#include "Common.ush"
+
+///*
+#include "ASTC_Define.ush"
+#include "ASTC_Table.ush"
+#include "ASTC_WeightsQuantize.ush"
+#include "ASTC_IntegerSequenceEncoding.ush"
 
 
 float3 mean(uint4 texels[BLOCK_SIZE], uint count)
@@ -73,7 +66,7 @@ float3 eigen_vector(float3x3 m)
 	return v;
 }
 
-void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count,	out float3 line_k, out float3 line_m)
+void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out float3 line_k, out float3 line_m)
 {
 	line_m = mean(texels, count);
 
@@ -109,158 +102,6 @@ void compute_dominant_direction_pca(uint4 texels[BLOCK_SIZE], uint count, out fl
 	find_min_max(texels, count, line_k, line_m, e0, e1);
 }
 
-
-uint equal_approx(uint4 ta, uint4 tb)
-{
-	int3 vd = ta.xyz - tb.xyz;
-	return step(dot(vd, vd), COLOR_EQUAL_EPSILON);
-}
-
-uint4 encode_constant_block(uint4 texels[BLOCK_SIZE])
-{
-	uint4 color = 0;
-	for (uint i = 0; i < BLOCK_SIZE; ++i)
-	{
-		color += texels[i];
-	}
-	// calculate average color
-	color = (color + BLOCK_SIZE / 2) / BLOCK_SIZE;
-
-	uint4 bcode = 0;
-	bcode.x = 0xFCFDFFFF;
-	bcode.y = 0xFFFFFFFF;
-	bcode.z = (color.x << 16) | (color.y);
-	bcode.w = (color.z << 16) | (color.w);
-	return bcode;
-}
-
-
-// return 0 on invalid mode, 1 on valid mode.
-uint decode_block_mode_2d(uint blockmode, uint xdim, uint ydim, out uint Nval, out uint Mval, out uint dual_weight_plane, out uint quant_mode)
-{
-	Nval = 0; Mval = 0, dual_weight_plane = 0, quant_mode = 0;
-
-	uint base_quant_mode = (blockmode >> 4) & 1;
-	uint H = (blockmode >> 9) & 1;
-	uint D = (blockmode >> 10) & 1;
-
-	uint A = (blockmode >> 5) & 0x3;
-
-	uint N = 0, M = 0;
-
-	if ((blockmode & 3) != 0)
-	{
-		base_quant_mode |= (blockmode & 3) << 1;
-		uint B = (blockmode >> 7) & 3;
-		switch ((blockmode >> 2) & 3)
-		{
-		case 0:
-			N = B + 4;
-			M = A + 2;
-			break;
-		case 1:
-			N = B + 8;
-			M = A + 2;
-			break;
-		case 2:
-			N = A + 2;
-			M = B + 8;
-			break;
-		case 3:
-			B &= 1;
-			if (blockmode & 0x100)
-			{
-				N = B + 2;
-				M = A + 2;
-			}
-			else
-			{
-				N = A + 2;
-				M = B + 6;
-			}
-			break;
-		}
-	}
-	else
-	{
-		base_quant_mode |= ((blockmode >> 2) & 3) << 1;
-		if (((blockmode >> 2) & 3) == 0)
-			return 0;
-		uint B = (blockmode >> 9) & 3;
-		switch ((blockmode >> 7) & 3)
-		{
-		case 0:
-			N = 12;
-			M = A + 2;
-			break;
-		case 1:
-			N = A + 2;
-			M = 12;
-			break;
-		case 2:
-			N = A + 6;
-			M = B + 6;
-			D = 0;
-			H = 0;
-			break;
-		case 3:
-			switch ((blockmode >> 5) & 3)
-			{
-			case 0:
-				N = 6;
-				M = 10;
-				break;
-			case 1:
-				N = 10;
-				M = 6;
-				break;
-			case 2:
-			case 3:
-				return 0;
-			}
-			break;
-		}
-	}
-
-	uint weight_count = N * M * (D + 1);
-	uint qmode = (base_quant_mode - 2) + 6 * H;
-
-	uint weightbits = compute_ise_bitcount(weight_count, qmode);
-	if (weight_count > MAX_WEIGHTS_PER_BLOCK
-		|| weightbits < MIN_WEIGHT_BITS_PER_BLOCK
-		|| weightbits > MAX_WEIGHT_BITS_PER_BLOCK)
-	{
-		return 0;
-	}
-
-	if (N > xdim || M > ydim)
-	{
-		return 0;
-	}
-
-	Nval = N;
-	Mval = M;
-	dual_weight_plane = D;
-	quant_mode = qmode;
-	return 1;
-}
-
-
-uint encode_block_mode(uint xdim, uint ydim, out uint x_grids, out uint y_grids, out uint quantize_mode)
-{
-	// then construct the list of block formats
-	for (uint i = 0; i < BLOCK_MODE_COUNT; ++i)
-	{
-		uint is_dual_plane = 0;
-		if (decode_block_mode_2d(i, xdim, ydim, x_grids, y_grids, is_dual_plane, quantize_mode))
-		{
-			return i;
-		}
-	}
-	return 0;
-}
-
-
 uint3 quantize_color(uint quant, uint3 c)
 {
 	uint3 result;
@@ -280,7 +121,7 @@ uint3 unquantize_color(uint quant, uint3 c)
 }
 
 
-void encode_rgb_direct(uint endpoints_quantmethod,	uint3 e0, uint3 e1, out uint endpoint_quantized[6])
+void encode_rgb_direct(uint endpoints_quantmethod, uint3 e0, uint3 e1, out uint endpoint_quantized[6])
 {
 	uint3 e0q = quantize_color(endpoints_quantmethod, e0);
 	uint3 e1q = quantize_color(endpoints_quantmethod, e1);
@@ -410,6 +251,7 @@ uint4 symbolic_to_physical(
 
 }
 
+
 uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1)
 {
 	// todo
@@ -427,29 +269,21 @@ uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1
 
 	uint weights_count = x_grids * y_grids;
 	uint endpoints_quantmethod = QUANT_256;
-	
+
 	uint i = 0;
 
 	// endpoints量化
 	uint endpoint_quantized[6];
 	int3 ie0 = round(e0);
 	int3 ie1 = round(e1);
+	encode_rgb_direct(endpoints_quantmethod, ie0, ie1, endpoint_quantized);
 
-
-	uint3 de = ie0 - ie1;
-	uint d = dot(de, de);
-	if (d < 50)
-	{
-		return encode_constant_block(texels);
-	}
-
-	encode_rgb_direct(endpoints_quantmethod, ie0, ie1, endpoint_quantized);	
 
 	// 插值权重量化
 	uint weights_quantized[BLOCK_SIZE];
 	calculate_quantized_weights_rgb(texels, weight_quantmethod, ie0, ie1, weights_quantized, x_grids, y_grids);
 
-	uint4 endpoint_ise = 0;	
+	uint4 endpoint_ise = 0;
 	// ise encode endpoints
 	uint src_buf[ISE_BYTE_COUNT];
 	for (i = 0; i < ISE_BYTE_COUNT; ++i)
@@ -473,31 +307,28 @@ uint4 encode_rgb_single_partition(uint4 texels[BLOCK_SIZE], float3 e0, float3 e1
 	}
 	integer_sequence_encode(src_buf, weights_count, weight_quantmethod, weights_ise, dst_count);
 
-	return symbolic_to_physical(color_endpoint_mode, endpoints_quantmethod, weight_quantmethod, partition_count, partition_index, endpoint_ise, weights_ise);
+	uint4 ret = symbolic_to_physical(color_endpoint_mode, endpoints_quantmethod, weight_quantmethod, partition_count, partition_index, endpoint_ise, weights_ise);
+
+	return ret;
 
 }
+
+
 
 uint4 compress(uint4 texels[BLOCK_SIZE])
 {
-	//uint sum = 0;
-	//for (uint i = 0; i < BLOCK_SIZE; ++i)
-	//{
-	//	sum += equal_approx(texels[i], texels[0]);
-	//}
-
-	//if (sum == BLOCK_SIZE)
-	//{
-	//	return encode_constant_block(texels);
-	//}
-
 	float3 e0, e1;
 	compute_dominant_direction_pca(texels, BLOCK_SIZE, e0, e1);
-	return encode_rgb_single_partition(texels, e0, e1);
-}
 
-[RootSignature(RootSig)]
+    uint4 blk = encode_rgb_single_partition(texels, e0, e1);
+
+	return blk;
+
+}
+///*/
+
 [numthreads(THREAD_NUM_X, THREAD_NUM_Y, 1)] // 一个group里的thread数目
-void main(
+void MainCS(
 	// 一个thread处理一个block
 	uint3 Gid : SV_GroupID,				// dispatch里的group坐标
 	uint3 GTid : SV_GroupThreadID,		// group里的thread坐标
@@ -505,8 +336,11 @@ void main(
 	uint Gidx : SV_GroupIndex)			// group里的thread坐标展开后的索引
 {
 	// DTid.xy 就是block坐标（第几个block）
-	uint2 blockSize = uint2(BLOCK_SIZE_X, BLOCK_SIZE_Y);
+
 	uint2 blockPos = DTid.xy;
+
+
+	uint2 blockSize = uint2(BLOCK_SIZE_X, BLOCK_SIZE_Y);
 
 	uint4 texels[BLOCK_SIZE];
 	uint i = 0;
@@ -516,16 +350,24 @@ void main(
 		uint x = i - y * BLOCK_SIZE_X;
 		uint2 localPos = uint2(x, y);
 		uint3 pixelPos = uint3(blockPos * blockSize + localPos, 0);
-		pixelPos.y = TexelHeight - 1 - pixelPos.y;
-		uint4 pixel = g_SrcTex.Load(pixelPos) * 255;
+		pixelPos.y = InTexelHeight - 1 - pixelPos.y;
+		uint4 pixel = InTexture.Load(pixelPos) * 255;
 		pixel = clamp(pixel, 0, 255);
 		texels[i] = pixel;
 	}
 
 	uint4 phy_blk = compress(texels);
 
-	uint blockID = blockPos.y * xGroupNum * THREAD_NUM_X + blockPos.x;
-	g_DstBuf[blockID] = phy_blk;
+    /*
+    uint4 phy_blk = uint4(
+    (0xFC << 24) | (0xFD << 16) | (0xFF << 8) | 0xFF,
+    0xFFFFFFFF,
+    0,
+    (0xFF << 8) | 0xFF);
+	*/
+
+	uint blockID = blockPos.y * InGroupNumX * THREAD_NUM_X + blockPos.x;
+	OutBuffer[blockID] = phy_blk;
 
 }
 
