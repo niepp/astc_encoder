@@ -100,7 +100,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 
 	// create shader
 	ID3D11ComputeShader* computeShader = nullptr;
-	HRESULT hr = create_shader(pd3dDevice, L"astc_encode.hlsl", "main", "cs_5_0", computeShader);
+	HRESULT hr = create_shader(pd3dDevice, L"ASTC_Encode.hlsl", "MainCS", "cs_5_0", computeShader);
 	if (FAILED(hr))
 	{
 		system("pause");

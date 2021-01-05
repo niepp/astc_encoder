@@ -9,13 +9,13 @@ RWStructuredBuffer<uint4> OutBuffer;
 #define THREAD_NUM_X 8
 #define THREAD_NUM_Y 8
 
-#include "Common.ush"
+//#include "Common.ush"
 
-///*
-#include "ASTC_Define.ush"
-#include "ASTC_Table.ush"
-#include "ASTC_WeightsQuantize.ush"
-#include "ASTC_IntegerSequenceEncoding.ush"
+
+#include "ASTC_Define.hlsl"
+#include "ASTC_Table.hlsl"
+#include "ASTC_WeightsQuantize.hlsl"
+#include "ASTC_IntegerSequenceEncoding.hlsl"
 
 
 float3 mean(uint4 texels[BLOCK_SIZE], uint count)
@@ -325,7 +325,7 @@ uint4 compress(uint4 texels[BLOCK_SIZE])
 	return blk;
 
 }
-///*/
+
 
 [numthreads(THREAD_NUM_X, THREAD_NUM_Y, 1)] // 一个group里的thread数目
 void MainCS(
@@ -357,14 +357,6 @@ void MainCS(
 	}
 
 	uint4 phy_blk = compress(texels);
-
-    /*
-    uint4 phy_blk = uint4(
-    (0xFC << 24) | (0xFD << 16) | (0xFF << 8) | 0xFF,
-    0xFFFFFFFF,
-    0,
-    (0xFF << 8) | 0xFF);
-	*/
 
 	uint blockID = blockPos.y * InGroupNumX * THREAD_NUM_X + blockPos.x;
 	OutBuffer[blockID] = phy_blk;
