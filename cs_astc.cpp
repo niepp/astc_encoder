@@ -220,12 +220,12 @@ int main()
 	std::string tcase = "puffin";
 	//std::string tcase = "blooming";
 
-	std::string src_tex = "F:/work_astc/astc_quality/origin/";
+	std::string src_tex = "F:/work_astc/astc_quality/testimg/";
 //	std::string dst_tex = "F:/work_astc/astc_quality/encode/";
 	std::string dst_tex = "F:/work_astc/ASTC_preview/Assets/Resources/";
 
 	// shader resource view
-	ID3D11Texture2D* pCubeTexture = load_tex(pd3dDevice, (src_tex + tcase + ".tga").c_str() );
+	ID3D11Texture2D* pCubeTexture = load_tex(pd3dDevice, (src_tex + tcase + ".png").c_str() );
 
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pCubeTexture->GetDesc(&TexDesc);

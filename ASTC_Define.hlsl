@@ -17,11 +17,13 @@
 #define MAX_ENCODED_WEIGHT_BYTES 12
 #define MAX_ENCODED_COLOR_ENDPOINT_BYTES 12
 
-/*
-* color_endpoint_mode_t
-*/
+#define SMALL_VALUE 0.00001
 
+/*
+* supported color_endpoint_mode
+*/
 #define CEM_LDR_RGB_DIRECT 8
+#define CEM_LDR_RGBA_DIRECT 12
 
 /**
  * Define normalized (starting at zero) numeric ranges that can be represented
@@ -49,6 +51,43 @@
 #define	QUANT_192 19
 #define	QUANT_256 20
 #define	QUANT_MAX 21
+
+// candidate blockmode (weights quantmethod & endpoints quantmethod)
+
+#define BLOCK_MODE_NUM 10
+
+static const uint block_modes[2][BLOCK_MODE_NUM][2] =
+{
+	{ // CEM_LDR_RGB_DIRECT
+		{QUANT_3, QUANT_256},
+		{QUANT_4, QUANT_256},
+		{QUANT_5, QUANT_256},
+		{QUANT_6, QUANT_256},
+		{QUANT_8, QUANT_256},
+		{QUANT_12, QUANT_256},
+		{QUANT_16, QUANT_192},
+		{QUANT_20, QUANT_96},
+		{QUANT_24, QUANT_64},
+		{QUANT_32, QUANT_32},
+	},
+
+	{ // CEM_LDR_RGBA_DIRECT
+		{QUANT_3, QUANT_256},
+		{QUANT_4, QUANT_256},
+		{QUANT_5, QUANT_256},
+		{QUANT_6, QUANT_256},
+		{QUANT_8, QUANT_192},
+		{QUANT_12, QUANT_96},
+		{QUANT_16, QUANT_48},
+		{QUANT_20, QUANT_32},
+		{QUANT_24, QUANT_24},
+		{QUANT_32, QUANT_12},
+	}
+};
+
+// form [ARM:astc-encoder]
+static const uint weight_quantize_table[] = { 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256 };
+
 
  /**
   * Table that describes the number of trits or quints along with bits required
@@ -160,25 +199,3 @@ void swap(inout uint lhs, inout uint rhs)
 	rhs = tmp;
 }
 
-/**
- * Compute the number of bits required to store a number of items in a specific
- * range using the bounded integer sequence encoding.
- */
-uint compute_ise_bitcount(uint items, uint range)
-{
-	uint bits = bits_trits_quints_table[range][0];
-	uint trits = bits_trits_quints_table[range][1];
-	uint quints = bits_trits_quints_table[range][2];
-
-	if (trits)
-	{
-		return ((8 + 5 * bits) * items + 4) / 5;
-	}
-
-	if (quints)
-	{
-		return ((7 + 3 * bits) * items + 2) / 3;
-	}
-
-	return items * bits;
-}

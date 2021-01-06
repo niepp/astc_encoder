@@ -79,3 +79,6 @@ void calculate_quantized_weights_rgb(uint4 texels[BLOCK_SIZE],
 
 	}
 }
+
+///////////////////////////
+

@@ -1,3 +1,25 @@
+/**
+ * Compute the number of bits required to store a number of items in a specific
+ * range using the bounded integer sequence encoding.
+ */
+uint compute_ise_bitcount(uint items, uint range)
+{
+	uint bits = bits_trits_quints_table[range][0];
+	uint trits = bits_trits_quints_table[range][1];
+	uint quints = bits_trits_quints_table[range][2];
+
+	if (trits)
+	{
+		return ((8 + 5 * bits) * items + 4) / 5;
+	}
+
+	if (quints)
+	{
+		return ((7 + 3 * bits) * items + 2) / 3;
+	}
+
+	return items * bits;
+}
 
 // 取第n个bit位的值
 uint getbit(uint number, uint n)
@@ -11,8 +33,6 @@ uint getbits(uint number, uint msb, uint lsb)
 	uint count = msb - lsb + 1;
 	return (number >> lsb) & ((1 << count) - 1);
 }
-
-// this is bad: Compiler failed with XPC_ERROR_CONNECTION_INTERRUPTED
 
 // 把number的低bitcount位写到bytes的bitoffset偏移处开始的位置
 // number must be <= 255; bitcount must be <= 8
@@ -55,6 +75,7 @@ uint4 orbits8_ptr(uint4 bytes, uint bitoffset, uint number, uint bitcount)
 
 	return retv;
 }
+
 void split_high_low(uint n, uint i, out uint high, out uint low)
 {
 	uint low_mask = (uint)((1 << i) - 1) & 0xFF;
