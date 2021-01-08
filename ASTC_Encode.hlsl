@@ -378,7 +378,11 @@ uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_co
 	phy_blk = orbits8_ptr(phy_blk, cem_offset, color_endpoint_mode, cem_bits);
 
 	// endpoints start from ( multi_part ? bits 29 : bits 17 )
-	copy_bytes(ep_ise, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
+
+	uint4 epdata = 0;
+	epdata.x = (ep_ise[0]) | (ep_ise[1] << 8) | (ep_ise[2] << 16) | (ep_ise[3] << 24);
+	epdata.y = (ep_ise[4]) | (ep_ise[5] << 8) | (ep_ise[6] << 16) | (ep_ise[7] << 24);
+	copy_bytes(epdata, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
 
 	return phy_blk;
 
@@ -453,11 +457,11 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_SIZE
 	else
 	{
 		uint endpoints_quantized[6];
-		encode_rgb(endpoint_quantmethod, ep0, ep1, endpoints_quantized);
+		encode_rgb(endpoint_quantmethod, ep0.rgb, ep1.rgb, endpoints_quantized);
 	}
 
 	// encode weights
-	uint weights_quantized[MAX_WEIGHTS_PER_BLOCK];
+	uint weights_quantized[BLOCK_SIZE];
 	calculate_quantized_weights(texels, weight_quantmethod, ep0, ep1, weights_quantized);
 
 	for (int i = 0; i < BLOCK_SIZE; ++i)
