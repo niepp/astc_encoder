@@ -11,10 +11,8 @@ RWStructuredBuffer<uint4> OutBuffer;
 
 //#include "Common.ush"
 
-
 #include "ASTC_Define.hlsl"
 #include "ASTC_Table.hlsl"
-//#include "ASTC_WeightsQuantize.hlsl"
 #include "ASTC_IntegerSequenceEncoding.hlsl"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
