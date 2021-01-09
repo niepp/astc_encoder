@@ -9,10 +9,8 @@
 
 typedef struct _csConstantBuffer
 {
-	int TexelWidth;
 	int TexelHeight;
 	int xGroupNum;
-	int yGroupNum;
 } CSConstantBuffer;
 
 
@@ -181,10 +179,8 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	int yGroupNum = (TexDesc.Height+ yGroupSize - 1) / yGroupSize;
 
 	CSConstantBuffer ConstBuff;
-	ConstBuff.TexelWidth = TexDesc.Width;
 	ConstBuff.TexelHeight = TexDesc.Height;
 	ConstBuff.xGroupNum = xGroupNum;
-	ConstBuff.yGroupNum = yGroupNum;
 
 	pDeviceContext->UpdateSubresource(pConstants, 0, 0, &ConstBuff, 0, 0);
 

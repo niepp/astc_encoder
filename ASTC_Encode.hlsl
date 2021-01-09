@@ -725,18 +725,16 @@ void MainCS(
 	}
 
 	uint count = BLOCK_SIZE;
-	uint hasalpha = 1;
+	uint hasalpha = 0;
 
-	//uint4 phy_blk = encode_single_partition(texels, count, hasalpha);
+	uint4 phy_blk = encode_single_partition(texels, count, hasalpha);
 
-	uint4 phy_blk = 0;
-
-	uint4 color = uint4(0xFF, 0, 0, 0xFF);
-
-	phy_blk.x = 0xFFFFFDFC;
-	phy_blk.y = 0xFFFFFFFF;
-	phy_blk.z = (color.r << 8) | (color.g << 24);
-	phy_blk.w = (color.b << 8) | (color.a << 24);
+	//int4 phy_blk = 0;
+	//uint4 color = uint4(0xFF, 0, 0, 0xFF);
+	//phy_blk.x = 0xFFFFFDFC;
+	//phy_blk.y = 0xFFFFFFFF;
+	//phy_blk.z = (color.r << 8) | (color.g << 24);
+	//phy_blk.w = (color.b << 8) | (color.a << 24);
 
 	uint blockID = blockPos.y * InGroupNumX * THREAD_NUM_X + blockPos.x;
 	OutBuffer[blockID] = phy_blk;
