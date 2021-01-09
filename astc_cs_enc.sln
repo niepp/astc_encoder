@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.30204.135
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "astc_cs_enc", "astc_cs_enc.vcxproj", "{AB64E407-1AC3-4A3F-AF98-A76C967322F4}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bise", "..\bise\bise.vcxproj", "{543C7F04-1E74-472B-AD3A-F4A03D4E1531}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cs_cpuver", "cs_cpuver\cs_cpuver.vcxproj", "{543C7F04-1E74-472B-AD3A-F4A03D4E1531}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -238,7 +238,7 @@ int main()
 	ZeroMemory(pMemBuf, bufLen);
 	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
 
-	save_astc((dst_tex + tcase + ".astc").c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
+	save_astc((dst_tex + tcase + "_cs.astc").c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
 
 	return 0;
 

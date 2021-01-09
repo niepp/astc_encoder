@@ -132,7 +132,7 @@ static const uint bits_trits_quints_table[QUANT_MAX][3] =
 };
 
 
-uint color_channel_sum(uint3 color)
+uint sum(uint3 color)
 {
 	return color.r + color.g + color.b;
 }
