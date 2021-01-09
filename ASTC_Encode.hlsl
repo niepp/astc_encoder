@@ -20,17 +20,17 @@ RWStructuredBuffer<uint4> OutBuffer;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calc the dominant axis
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-float4 mean(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_SIZE], uint count)
+float4 mean(uint4 texels[BLOCK_SIZE], uint count)
 {
 	float4 sum = float4(0, 0, 0, 0);
 	for (uint i = 0; i < count; ++i)
 	{
-		sum += texels[indexmap[i]];
+		sum += texels[i];
 	}
 	return sum / count;
 }
 
-float4x4 covariance(float4 m[BLOCK_SIZE], uint indexmap[BLOCK_SIZE], uint count)
+float4x4 covariance(float4 m[BLOCK_SIZE], uint count)
 {
 	float inv = 1.0 / (count - 1);
 	float4x4 cov;
@@ -41,7 +41,7 @@ float4x4 covariance(float4 m[BLOCK_SIZE], uint indexmap[BLOCK_SIZE], uint count)
 			float s = 0;
 			for (uint k = 0; k < count; ++k)
 			{
-				float4 p = m[indexmap[k]];
+				float4 p = m[k];
 				s += p[i] * p[j];
 			}
 			cov[i][j] = s * inv;
@@ -61,9 +61,9 @@ float4 eigen_vector(float4x4 m)
 	return v;
 }
 
-void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_SIZE], uint count, out float4 e0, out float4 e1)
+void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out float4 e0, out float4 e1)
 {
-	float4 pt_mean = mean(texels, indexmap, count);
+	float4 pt_mean = mean(texels, count);
 
 	float4 sub[BLOCK_SIZE];
 	uint i = 0;
@@ -72,7 +72,7 @@ void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_
 		sub[i] = texels[i] - pt_mean;
 	}
 
-	float4x4 cov = covariance(sub, indexmap, count);
+	float4x4 cov = covariance(sub, count);
 
 	float4 vec_k = eigen_vector(cov);
 
@@ -103,34 +103,38 @@ void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_
 uint3 quantize_rgb(uint quantmethod, uint3 c)
 {
 	uint3 result;
-	result.r = color_quantize_table[quantmethod][c.r];
-	result.g = color_quantize_table[quantmethod][c.g];
-	result.b = color_quantize_table[quantmethod][c.b];
+	uint qm = quant_method_map[quantmethod];
+	result.r = color_quantize_table[qm][c.r];
+	result.g = color_quantize_table[qm][c.g];
+	result.b = color_quantize_table[qm][c.b];
 	return result;
 }
 
 uint3 unquantize_rgb(uint quantmethod, uint3 c)
 {
 	uint3 result;
-	result.r = color_unquantize_table[quantmethod][c.r];
-	result.g = color_unquantize_table[quantmethod][c.g];
-	result.b = color_unquantize_table[quantmethod][c.b];
+	uint qm = quant_method_map[quantmethod];
+	result.r = color_unquantize_table[qm][c.r];
+	result.g = color_unquantize_table[qm][c.g];
+	result.b = color_unquantize_table[qm][c.b];
 	return result;
 }
 
 uint4 quantize_rgba(uint quantmethod, uint4 c)
 {
 	uint4 result;
+	uint qm = quant_method_map[quantmethod];
 	result.rgb = quantize_rgb(quantmethod, c.rgb);
-	result.a = color_quantize_table[quantmethod][c.a];
+	result.a = color_quantize_table[qm][c.a];
 	return result;
 }
 
 uint4 unquantize_rgba(uint quantmethod, uint4 c)
 {
 	uint4 result;
+	uint qm = quant_method_map[quantmethod];
 	result.rgb = unquantize_rgb(quantmethod, c.rgb);
-	result.a = color_unquantize_table[quantmethod][c.a];
+	result.a = color_unquantize_table[qm][c.a];
 	return result;
 }
 
@@ -148,12 +152,13 @@ void encode_rgb(uint quantmethod, float3 e0, float3 e1, out uint endpoint_quanti
 
 void decode_rgb(uint quantmethod, uint endpoint_quantized[6], out float3 e0, out float3 e1)
 {
-	int ir0 = color_unquantize_table[quantmethod][endpoint_quantized[0]];
-	int ir1 = color_unquantize_table[quantmethod][endpoint_quantized[1]];
-	int ig0 = color_unquantize_table[quantmethod][endpoint_quantized[2]];
-	int ig1 = color_unquantize_table[quantmethod][endpoint_quantized[3]];
-	int ib0 = color_unquantize_table[quantmethod][endpoint_quantized[4]];
-	int ib1 = color_unquantize_table[quantmethod][endpoint_quantized[5]];
+	uint qm = quant_method_map[quantmethod];
+	int ir0 = color_unquantize_table[qm][endpoint_quantized[0]];
+	int ir1 = color_unquantize_table[qm][endpoint_quantized[1]];
+	int ig0 = color_unquantize_table[qm][endpoint_quantized[2]];
+	int ig1 = color_unquantize_table[qm][endpoint_quantized[3]];
+	int ib0 = color_unquantize_table[qm][endpoint_quantized[4]];
+	int ib1 = color_unquantize_table[qm][endpoint_quantized[5]];
 	e0 = float3(ir0, ig0, ib0);
 	e1 = float3(ir1, ig1, ib1);
 }
@@ -174,14 +179,15 @@ void encode_rgba(uint quantmethod, float4 e0, float4 e1, out uint endpoint_quant
 
 void decode_rgba(uint quantmethod, uint endpoint_quantized[8], out float4 e0, out float4 e1)
 {
-	int ir0 = color_unquantize_table[quantmethod][endpoint_quantized[0]];
-	int ir1 = color_unquantize_table[quantmethod][endpoint_quantized[1]];
-	int ig0 = color_unquantize_table[quantmethod][endpoint_quantized[2]];
-	int ig1 = color_unquantize_table[quantmethod][endpoint_quantized[3]];
-	int ib0 = color_unquantize_table[quantmethod][endpoint_quantized[4]];
-	int ib1 = color_unquantize_table[quantmethod][endpoint_quantized[5]];
-	int a0 = color_unquantize_table[quantmethod][endpoint_quantized[6]];
-	int a1 = color_unquantize_table[quantmethod][endpoint_quantized[7]];
+	uint qm = quant_method_map[quantmethod];
+	int ir0 = color_unquantize_table[qm][endpoint_quantized[0]];
+	int ir1 = color_unquantize_table[qm][endpoint_quantized[1]];
+	int ig0 = color_unquantize_table[qm][endpoint_quantized[2]];
+	int ig1 = color_unquantize_table[qm][endpoint_quantized[3]];
+	int ib0 = color_unquantize_table[qm][endpoint_quantized[4]];
+	int ib1 = color_unquantize_table[qm][endpoint_quantized[5]];
+	int a0 = color_unquantize_table[qm][endpoint_quantized[6]];
+	int a1 = color_unquantize_table[qm][endpoint_quantized[7]];
 	e0 = float4(ir0, ig0, ib0, a0);
 	e1 = float4(ir1, ig1, ib1, a1);
 }
@@ -336,26 +342,30 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 	}
 }
 
-uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_count, uint partition_index, uint ep_ise[8], uint ep_bitcnt, uint wt_ise[16], uint wt_bitcnt)
+uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_count, uint partition_index, uint4 ep_ise, uint ep_bitcnt, uint4 wt_ise, uint wt_bitcnt)
 {
+
+	uint weights[16];
+	uint4_2_array16(wt_ise, weights);
+
 	uint i = 0;
 	uint j = MAX_ENCODED_WEIGHT_BYTES - 1;
 	for (; i < j; ++i, --j)
 	{
-		swap(wt_ise[i], wt_ise[j]);
+		swap(weights[i], weights[j]);
 	}
 
 	for (i = 0; i < MAX_ENCODED_WEIGHT_BYTES; ++i)
 	{
-		wt_ise[i] = reverse_byte(wt_ise[i]);
+		weights[i] = reverse_byte(weights[i]);
 	}
 
 	for (i = BLOCK_BYTES - 1; i >= BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES; --i)
 	{
-		wt_ise[i] = wt_ise[i - (BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES)];
+		weights[i] = weights[i - (BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES)];
 	}
 
-	uint4 phy_blk = array16_2_uint4(wt_ise);
+	uint4 phy_blk = array16_2_uint4(weights);
 	phy_blk = orbits8_ptr(phy_blk, 0, blockmode & 0xFF, 8);
 	phy_blk = orbits8_ptr(phy_blk, 8, (blockmode >> 8) & 0xFF, 3);
 
@@ -379,19 +389,16 @@ uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_co
 
 	// endpoints start from ( multi_part ? bits 29 : bits 17 )
 
-	uint4 epdata = 0;
-	epdata.x = (ep_ise[0]) | (ep_ise[1] << 8) | (ep_ise[2] << 16) | (ep_ise[3] << 24);
-	epdata.y = (ep_ise[4]) | (ep_ise[5] << 8) | (ep_ise[6] << 16) | (ep_ise[7] << 24);
-	copy_bytes(epdata, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
+	copy_bytes(ep_ise, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
 
 	return phy_blk;
 
 }
 
-uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_SIZE], uint count, uint hasalpha)
+uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalpha)
 {
 	float4 ep0, ep1;
-	principal_component_analysis(texels, indexmap, count, ep0, ep1);
+	principal_component_analysis(texels, count, ep0, ep1);
 
 	// for single partition
 	uint partition_index = 0;
@@ -448,35 +455,50 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint indexmap[BLOCK_SIZE
 	blockmode |= h << 9;
 	blockmode |= d << 10;
 
+	uint endpoints_quantized[ISE_BYTE_COUNT];
+	int i = 0;
+	for (i = 0; i < ISE_BYTE_COUNT; ++i)
+	{
+		endpoints_quantized[i] = 0;
+	}
+
 	// encode endpoints
 	if (hasalpha > 0)
 	{
-		uint endpoints_quantized[8];
-		encode_rgba(endpoint_quantmethod, ep0, ep1, endpoints_quantized);
+		uint ep_quantized[8];
+		encode_rgba(endpoint_quantmethod, ep0, ep1, ep_quantized);
+		for (i = 0; i < 8; ++i)
+		{
+			endpoints_quantized[i] = ep_quantized[i];
+		}
 	}
 	else
 	{
-		uint endpoints_quantized[6];
-		encode_rgb(endpoint_quantmethod, ep0.rgb, ep1.rgb, endpoints_quantized);
+		uint ep_quantized[6];
+		encode_rgb(endpoint_quantmethod, ep0.rgb, ep1.rgb, ep_quantized);
+		for (i = 0; i < 6; ++i)
+		{
+			endpoints_quantized[i] = ep_quantized[i];
+		}
 	}
 
 	// encode weights
 	uint weights_quantized[BLOCK_SIZE];
 	calculate_quantized_weights(texels, weight_quantmethod, ep0, ep1, weights_quantized);
 
-	for (int i = 0; i < BLOCK_SIZE; ++i)
+	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
 		weights_quantized[i] = scramble_table[weight_quantmethod][weights_quantized[i]];
 	}
 
 	// endpoints_quantized ise encode
-	uint ep_ise[8];
+	uint4 ep_ise;
 	uint ep_bitcnt = 0;
 	uint ep_bytecnt = step(1, hasalpha) * 2 + 6;
 	integer_sequence_encode(endpoints_quantized, ep_bytecnt, endpoint_quantmethod, ep_ise, ep_bitcnt);
 
 	// weights_quantized ise encode
-	uint wt_ise[16];
+	uint4 wt_ise;
 	uint wt_bitcnt = 0;
 	integer_sequence_encode(weights_quantized, weights_count, weight_quantmethod, wt_ise, wt_bitcnt);
 
@@ -702,12 +724,10 @@ void MainCS(
 		texels[i] = pixel;
 	}
 
-	uint indexmap[] = {0, 1, 2, 3, 4, 5, 6, 7, 8,
-					  9, 10, 11, 12, 13, 14, 15, 16 };
 	uint count = BLOCK_SIZE;
 	uint hasalpha = 1;
 
-	uint4 phy_blk = encode_single_partition(texels, indexmap, count, hasalpha);
+	uint4 phy_blk = encode_single_partition(texels, count, hasalpha);
 
 	uint blockID = blockPos.y * InGroupNumX * THREAD_NUM_X + blockPos.x;
 	OutBuffer[blockID] = phy_blk;

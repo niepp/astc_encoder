@@ -52,10 +52,9 @@
 #define	QUANT_256 20
 #define	QUANT_MAX 21
 
+
 // candidate blockmode (weights quantmethod & endpoints quantmethod)
-
 #define BLOCK_MODE_NUM 10
-
 static const uint block_modes[2][BLOCK_MODE_NUM][2] =
 {
 	{ // CEM_LDR_RGB_DIRECT
@@ -84,6 +83,20 @@ static const uint block_modes[2][BLOCK_MODE_NUM][2] =
 		{QUANT_32, QUANT_12},
 	}
 };
+
+// endpoint method only use
+/*
+	QUANT_12
+	QUANT_24
+	QUANT_32
+	QUANT_48
+	QUANT_64
+	QUANT_96
+	QUANT_192
+	QUANT_256
+*/
+
+static const uint quant_method_map[] = { 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 1, 2, 255, 3, 4, 255, 5, 255, 255, 6, 7, };
 
 // form [ARM:astc-encoder]
 static const uint weight_quantize_table[] = { 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256 };
