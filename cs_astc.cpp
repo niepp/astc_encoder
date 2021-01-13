@@ -231,12 +231,30 @@ int main()
 	pCubeTexture->GetDesc(&TexDesc);
 
 	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pCubeTexture);
-	
+
 	// save to file
 	uint32_t bufLen = 16 * ((TexDesc.Height + cBlockDimY - 1) / cBlockDimY) * ((TexDesc.Width + cBlockDimX - 1) / cBlockDimX);
 	uint8_t* pMemBuf = new uint8_t[bufLen];
 	ZeroMemory(pMemBuf, bufLen);
 	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+
+
+
+	//{
+
+	//	uint8_t* pd = pMemBuf + (127 * 128 + 4) * 16;
+
+	//	pd[0] = 83;
+	//	pd[1] = 0;
+	//	pd[2] = 1;
+
+	//	for (int i = 3; i < 16; ++i)
+	//	{
+	//		pd[i] = 0;
+	//	}
+
+	//}
+
 
 	save_astc((dst_tex + tcase + "_cs.astc").c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
 

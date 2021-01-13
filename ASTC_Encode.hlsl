@@ -54,6 +54,11 @@ float4 eigen_vector(float4x4 m)
 	float4 v = normalize(float4(1, 3, 2, 0));
 	for (uint i = 0; i < 8; ++i)
 	{
+		v = mul(m, v);
+		if (length(v) < SMALL_VALUE)
+		{
+			return v;
+		}
 		v = normalize(mul(m, v));
 	}
 	return v;
@@ -89,6 +94,7 @@ void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out floa
 		a = min(a, t);
 		b = max(b, t);
 	}
+
 	e0 = clamp(vec_k * a + pt_mean, 0.0, 255.0);
 	e1 = clamp(vec_k * b + pt_mean, 0.0, 255.0);
 
@@ -263,8 +269,8 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 	}
 	else
 	{
-		float minw = 1000000.0;
-		float maxw = -1000000.0;
+		float minw = 1e31;
+		float maxw = -1e31;
 		float projw[BLOCK_SIZE];
 		uint i = 0;
 		for (i = 0; i < BLOCK_SIZE; ++i)
@@ -301,7 +307,7 @@ void lerp_colors_by_weights(uint weights_quantized[BLOCK_SIZE], uint quantmethod
 
 void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, uint hasalpha, out uint best_wt_quant, out uint best_ep_quant)
 {
-	float minerr = 100000000.0;
+	float minerr = 1e31;
 	if (hasalpha > 0)
 	{
 		for (int i = 0; i < BLOCK_MODE_NUM; ++i)
@@ -577,10 +583,9 @@ void MainCS(
 		texels[i] = pixel;
 	}
 
-	uint count = BLOCK_SIZE;
 	uint hasalpha = 0;
 
-	uint4 phy_blk = encode_single_partition(texels, count, hasalpha);
+	uint4 phy_blk = encode_single_partition(texels, BLOCK_SIZE, hasalpha);
 
 	//int4 phy_blk = 0;
 	//uint4 color = uint4(0xFF, 0, 0, 0xFF);
