@@ -64,7 +64,7 @@ float4 eigen_vector(float4x4 m)
 	return v;
 }
 
-void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out float4 e0, out float4 e1)
+void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out float4 e0, out float4 e1, out float dots[16])
 {
 	float4 pt_mean = mean(texels, count);
 
@@ -93,10 +93,14 @@ void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint count, out floa
 		float t = dot(sub[i], vec_k);
 		a = min(a, t);
 		b = max(b, t);
+		dots[i] = (t + 10.0) * 10.0;
 	}
 
 	e0 = clamp(vec_k * a + pt_mean, 0.0, 255.0);
 	e1 = clamp(vec_k * b + pt_mean, 0.0, 255.0);
+
+	//e0 = frac(pt_mean) * 100;
+	//e1 = vec_k * 100;
 
 }
 
@@ -164,7 +168,7 @@ void encode_rgb(uint quantmethod, float3 e0, float3 e1, out uint endpoint_quanti
 	endpoint_quantized[5] = e1q.b;
 }
 
-void decode_rgb(uint quantmethod, uint endpoint_quantized[6], out float3 e0, out float3 e1)
+void decode_rgb(uint quantmethod, uint endpoint_quantized[6], out float4 e0, out float4 e1)
 {
 	uint qm = quant_method_map[quantmethod];
 	int ir0 = color_unquantize_table[qm][endpoint_quantized[0]];
@@ -176,13 +180,13 @@ void decode_rgb(uint quantmethod, uint endpoint_quantized[6], out float3 e0, out
 
 	if (ir0 + ig0 + ib0 > ir1 + ig1 + ib1)
 	{
-		e0 = float3(ir1, ig1, ib1);
-		e1 = float3(ir0, ig0, ib0);
+		e0 = float4(ir1, ig1, ib1, 255);
+		e1 = float4(ir0, ig0, ib0, 255);
 	}
 	else
 	{
-		e0 = float3(ir0, ig0, ib0);
-		e1 = float3(ir1, ig1, ib1);
+		e0 = float4(ir0, ig0, ib0, 255);
+		e1 = float4(ir1, ig1, ib1, 255);
 	}
 }
 
@@ -242,8 +246,10 @@ void decode_rgba(uint quantmethod, uint endpoint_quantized[8], out float4 e0, ou
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 uint quantize_weight(uint quantmethod, float weight)
 {
-	uint u = clamp(weight, 0.0, 1.0) * (weight_quantize_table[quantmethod] - 1);
-	return u;
+	uint r = (weight_quantize_table[quantmethod] - 1);
+	float u = clamp(weight, 0.0, 1.0) * r;
+	uint q = (uint)(u + 0.5);
+	return clamp(q, 0, r);
 }
 
 float unquantize_weight(uint quantmethod, uint qw)
@@ -269,6 +275,7 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 	}
 	else
 	{
+		vec_k = normalize(vec_k);
 		float minw = 1e31;
 		float maxw = -1e31;
 		float projw[BLOCK_SIZE];
@@ -305,16 +312,16 @@ void lerp_colors_by_weights(uint weights_quantized[BLOCK_SIZE], uint quantmethod
 // encode single partition
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, uint hasalpha, out uint best_wt_quant, out uint best_ep_quant)
+void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, uint hasalpha, out uint best_wt_quant, out uint best_ep_quant, out float err[16])
 {
 	float minerr = 1e31;
 	if (hasalpha > 0)
 	{
-		for (int i = 0; i < BLOCK_MODE_NUM; ++i)
+		for (int k = 0; k < BLOCK_MODE_NUM; ++k)
 		{
 			// encode
-			uint wq_level = block_modes[1][i][0];
-			uint cq_level = block_modes[1][i][1];
+			uint wq_level = block_modes[1][k][0];
+			uint cq_level = block_modes[1][k][1];
 			uint endpoints_quantized[8];
 			uint weights_quantized[BLOCK_SIZE];
 			encode_rgba(cq_level, ep0, ep1, endpoints_quantized);
@@ -347,11 +354,12 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 	}
 	else
 	{
-		for (int i = 0; i < BLOCK_MODE_NUM; ++i)
+		for (int k = 0; k < BLOCK_MODE_NUM; ++k)
 		{
+			//int k = 0;
 			// encode
-			uint wq_level = block_modes[0][i][0];
-			uint cq_level = block_modes[0][i][1];
+			uint wq_level = block_modes[0][k][0];
+			uint cq_level = block_modes[0][k][1];
 			uint endpoints_quantized[6];
 			uint weights_quantized[BLOCK_SIZE];
 			encode_rgb(cq_level, ep0.rgb, ep1.rgb, endpoints_quantized);
@@ -360,7 +368,7 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 			// decode
 			float4 decode_ep0 = 0;
 			float4 decode_ep1 = 0;
-			decode_rgb(cq_level, endpoints_quantized, decode_ep0.rgb, decode_ep1.rgb);
+			decode_rgb(cq_level, endpoints_quantized, decode_ep0, decode_ep1);
 			float4 decode_texels[BLOCK_SIZE];
 			lerp_colors_by_weights(weights_quantized, wq_level, decode_ep0, decode_ep1, decode_texels);
 
@@ -372,7 +380,37 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 				float squlen = dot(diff, diff);
 				sum += squlen;
 			}
+			
+			err[k] = sqrt(sum / 16.0);
+		
+			//err[0] = texels[0].x;
+			//err[1] = texels[0].y;
+			//err[2] = texels[0].z;
+			//err[3] = texels[0].w;
+			//err[4] = decode_texels[0].x;
+			//err[5] = decode_texels[0].y;
+			//err[6] = decode_texels[0].z;
+			//err[7] = decode_texels[0].w;
 
+			//float4 vec_k = normalize(ep1 - ep0);
+			//for (int i = 0; i < BLOCK_SIZE; ++i)
+			//{
+			//	// projw[i]
+			//	err[i] = dot(vec_k, texels[i] - ep0);
+			//}
+
+			//err[0] = (ep0).x;
+			//err[1] = (ep0).y;
+			//err[2] = (ep0).z;
+			//err[3] = (ep0).w;
+
+			//err[4] = (ep1).x;
+			//err[5] = (ep1).y;
+			//err[6] = (ep1).z;
+			//err[7] = (ep1).w;
+
+
+			
 			if (sum < minerr)
 			{
 				minerr = sum;
@@ -380,6 +418,14 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 				best_ep_quant = cq_level;
 			}
 
+		}
+
+		for (int k = 0; k < 16; ++k)
+		{
+			err[k] *= 100.0;
+
+			if (k>=10)
+				err[k] = 255;
 		}
 
 	}
@@ -434,7 +480,6 @@ uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_co
 	phy_blk = orbits8_ptr(phy_blk, cem_offset, color_endpoint_mode, cem_bits);
 
 	// endpoints start from ( multi_part ? bits 29 : bits 17 )
-
 	copy_bytes(ep_ise, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
 
 	return phy_blk;
@@ -443,8 +488,9 @@ uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_co
 
 uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalpha)
 {
+	float dots[16];
 	float4 ep0, ep1;
-	principal_component_analysis(texels, count, ep0, ep1);
+	principal_component_analysis(texels, count, ep0, ep1, dots);
 
 	// for single partition
 	uint partition_index = 0;
@@ -476,7 +522,9 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalph
 	uint endpoint_quantmethod = QUANT_256;
 	uint color_endpoint_mode = hasalpha ? CEM_LDR_RGBA_DIRECT : CEM_LDR_RGB_DIRECT;
 
-	//choose_best_quantmethod(texels, ep0, ep1, hasalpha, weight_quantmethod, endpoint_quantmethod);
+	float err[16];
+
+	choose_best_quantmethod(texels, ep0, ep1, hasalpha, weight_quantmethod, endpoint_quantmethod, err);
 
 	// reference from arm astc encoder "symbolic_to_physical"
 	uint bytes_of_one_endpoint = 2 * (color_endpoint_mode >> 2) + 2;
@@ -551,6 +599,26 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalph
 	// assemble to astcblock
 	return assemble_block(blockmode, color_endpoint_mode, partition_count, partition_index, ep_ise, ep_bitcnt, wt_ise, wt_bitcnt);
 
+	//err[0] = ep0.x;
+	//err[1] = ep0.y;
+	//err[2] = ep0.z;
+	//err[3] = ep0.w;
+
+	//err[4] = ep1.x;
+	//err[5] = ep1.y;
+	//err[6] = ep1.z;
+	//err[7] = ep1.w;
+
+
+	uint u16[16];
+	for (i = 0; i < BLOCK_SIZE; ++i)
+	{
+		//u16[i] = dots[i];
+		u16[i] = err[i];
+	}
+
+	//return array16_2_uint4(u16);
+
 }
 
 
@@ -586,6 +654,19 @@ void MainCS(
 	uint hasalpha = 0;
 
 	uint4 phy_blk = encode_single_partition(texels, BLOCK_SIZE, hasalpha);
+
+	//phy_blk.x = (texels[0].x) | (texels[0].y << 8) | (texels[0].z << 16) | (texels[0].w << 24);
+	//phy_blk.y = (texels[1].x) | (texels[1].y << 8) | (texels[1].z << 16) | (texels[1].w << 24);
+	//phy_blk.z = (texels[2].x) | (texels[2].y << 8) | (texels[2].z << 16) | (texels[2].w << 24);
+	//phy_blk.w = (texels[3].x) | (texels[3].y << 8) | (texels[3].z << 16) | (texels[3].w << 24);
+
+	//int c = 8;
+
+	//phy_blk.x = (texels[c + 0].x) | (texels[c + 0].y << 8) | (texels[c + 0].z << 16) | (texels[c + 0].w << 24);
+	//phy_blk.y = (texels[c + 1].x) | (texels[c + 1].y << 8) | (texels[c + 1].z << 16) | (texels[c + 1].w << 24);
+	//phy_blk.z = (texels[c + 2].x) | (texels[c + 2].y << 8) | (texels[c + 2].z << 16) | (texels[c + 2].w << 24);
+	//phy_blk.w = (texels[c + 3].x) | (texels[c + 3].y << 8) | (texels[c + 3].z << 16) | (texels[c + 3].w << 24);
+
 
 	//int4 phy_blk = 0;
 	//uint4 color = uint4(0xFF, 0, 0, 0xFF);

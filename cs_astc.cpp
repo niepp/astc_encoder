@@ -220,7 +220,7 @@ int main()
 	std::string tcase = "puffin";
 	//std::string tcase = "blooming";
 
-	std::string src_tex = "F:/work_astc/astc_quality/testimg/";
+	std::string src_tex = "F:/work_astc/ASTC_preview/Assets/Resources/";
 //	std::string dst_tex = "F:/work_astc/astc_quality/encode/";
 	std::string dst_tex = "F:/work_astc/ASTC_preview/Assets/Resources/";
 
@@ -240,20 +240,20 @@ int main()
 
 
 
-	//{
+	{
 
-	//	uint8_t* pd = pMemBuf + (127 * 128 + 4) * 16;
+		uint8_t* pd = pMemBuf;// +(64 * 128 + 54) * 16;
 
-	//	pd[0] = 83;
-	//	pd[1] = 0;
-	//	pd[2] = 1;
+		pd[0] = 83;
+		pd[1] = 0;
+		pd[2] = 1;
 
-	//	for (int i = 3; i < 16; ++i)
-	//	{
-	//		pd[i] = 0;
-	//	}
+		for (int i = 3; i < 16; ++i)
+		{
+			pd[i] = 0;
+		}
 
-	//}
+	}
 
 
 	save_astc((dst_tex + tcase + "_cs.astc").c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);

@@ -215,7 +215,7 @@ void encode_by_trits(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount,
 {
 	uint4 outbytes = 0;
 	uint bitpos = 0;
-	for (uint i = 0; i < numcount; i += 5)
+	for (uint i = 0; i < numcount-4; i += 5)
 	{
 		uint b0 = numbers[i + 0];
 		uint b1 = i + 1 >= numcount ? 0 : numbers[i + 1];
@@ -236,7 +236,7 @@ void encode_by_quints(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount
 {
 	uint4 outbytes = 0;
 	uint bitpos = 0;
-	for (uint i = 0; i < numcount; i += 3)
+	for (uint i = 0; i < numcount-2; i += 3)
 	{
 		uint b0 = numbers[i + 0];
 		uint b1 = i + 1 >= numcount ? 0 : numbers[i + 1];
