@@ -215,13 +215,29 @@ void encode_by_trits(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount,
 {
 	uint4 outbytes = 0;
 	uint bitpos = 0;
-	for (uint i = 0; i < numcount-4; i += 5)
+
+	uint num = (numcount + 4) - (numcount + 4) % 5;
+
+	//uint num = ((numcount % 5) == 0) ? numcount : 5 * ceil(numcount / 5.0);
+
+	uint elements[ISE_BYTE_COUNT + 4];
+	for (uint i = 0; i < ISE_BYTE_COUNT + 4; ++i)
 	{
-		uint b0 = numbers[i + 0];
-		uint b1 = i + 1 >= numcount ? 0 : numbers[i + 1];
-		uint b2 = i + 2 >= numcount ? 0 : numbers[i + 2];
-		uint b3 = i + 3 >= numcount ? 0 : numbers[i + 3];
-		uint b4 = i + 4 >= numcount ? 0 : numbers[i + 4];
+		elements[i] = 0;
+	}
+
+	for (uint i = 0; i < numcount; ++i)
+	{
+		elements[i] = numbers[i];
+	}
+
+	for (uint i = 0; i < num; i += 5)
+	{
+		uint b0 = elements[i + 0];
+		uint b1 = elements[i + 1];
+		uint b2 = elements[i + 2];
+		uint b3 = elements[i + 3];
+		uint b4 = elements[i + 4];
 		encode_trits(bitcount, b0, b1, b2, b3, b4, outbytes, bitpos);
 	}
 	outputs = outbytes;
@@ -236,13 +252,33 @@ void encode_by_quints(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount
 {
 	uint4 outbytes = 0;
 	uint bitpos = 0;
-	for (uint i = 0; i < numcount-2; i += 3)
+
+	//uint num = (uint)((numcount + 2) / 3);
+
+	uint num = (numcount + 2) - (numcount + 2) % 3;
+
+	//uint num = ((numcount % 3) == 0) ? numcount : 3 * ceil(numcount / 3.0);
+
+
+	uint elements[ISE_BYTE_COUNT + 2];
+	for (uint i = 0; i < ISE_BYTE_COUNT + 2; ++i)
 	{
-		uint b0 = numbers[i + 0];
-		uint b1 = i + 1 >= numcount ? 0 : numbers[i + 1];
-		uint b2 = i + 2 >= numcount ? 0 : numbers[i + 2];
+		elements[i] = 0;
+	}
+
+	for (uint i = 0; i < numcount; ++i)
+	{
+		elements[i] = numbers[i];
+	}
+
+	for (uint i = 0; i < num; i += 3)
+	{
+		uint b0 = elements[i + 0];
+		uint b1 = elements[i + 1];
+		uint b2 = elements[i + 2];
 		encode_quints(bitcount, b0, b1, b2, outbytes, bitpos);
 	}
+
 	outputs = outbytes;
 	bitoffset = bitpos;
 }

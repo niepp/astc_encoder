@@ -242,16 +242,20 @@ int main()
 
 	{
 
-		uint8_t* pd = pMemBuf;// +(64 * 128 + 54) * 16;
+		int row = 0;
+		int col = 8;
+		uint8_t* pd = pMemBuf + (row * 128 + col) * 16;
 
-		pd[0] = 83;
-		pd[1] = 0;
-		pd[2] = 1;
+		int nothing = 0;
 
-		for (int i = 3; i < 16; ++i)
-		{
-			pd[i] = 0;
-		}
+		//pd[0] = 83;
+		//pd[1] = 0;
+		//pd[2] = 1;
+
+		//for (int i = 3; i < 16; ++i)
+		//{
+		//	pd[i] = 0;
+		//}
 
 	}
 
