@@ -262,7 +262,7 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 	uint quantmethod,
 	float4 ep0,
 	float4 ep1,
-	out uint weights[BLOCK_SIZE])
+	inout uint weights[ISE_BYTE_COUNT])
 {
 	float4 vec_k = ep1 - ep0;
 	uint squdist = dot(vec_k, vec_k);
@@ -297,7 +297,7 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 	}
 }
 
-void lerp_colors_by_weights(uint weights_quantized[BLOCK_SIZE], uint quantmethod, float4 ep0, float4 ep1, out float4 decode_texels[BLOCK_SIZE])
+void lerp_colors_by_weights(uint weights_quantized[ISE_BYTE_COUNT], uint quantmethod, float4 ep0, float4 ep1, out float4 decode_texels[BLOCK_SIZE])
 {
 	for (int i = 0; i < BLOCK_SIZE; ++i)
 	{
@@ -323,7 +323,12 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 			uint wq_level = block_modes[1][k][0];
 			uint cq_level = block_modes[1][k][1];
 			uint endpoints_quantized[8];
-			uint weights_quantized[BLOCK_SIZE];
+			uint weights_quantized[ISE_BYTE_COUNT];
+			uint i = 0;
+			for (i = 0; i < ISE_BYTE_COUNT; ++i)
+			{
+				weights_quantized[i] = 0;
+			}
 			encode_rgba(cq_level, ep0, ep1, endpoints_quantized);
 			calculate_quantized_weights(texels, wq_level, ep0, ep1, weights_quantized);
 
@@ -336,7 +341,7 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 
 			// compare the decode texels and origin
 			float sum = 0;
-			for (int i = 0; i < BLOCK_SIZE; ++i)
+			for (i = 0; i < BLOCK_SIZE; ++i)
 			{
 				float4 diff = texels[i] - decode_texels[i];
 				float squlen = dot(diff, diff);
@@ -356,12 +361,16 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 	{
 		for (int k = 0; k < BLOCK_MODE_NUM; ++k)
 		{
-			//int k = 0;
 			// encode
 			uint wq_level = block_modes[0][k][0];
 			uint cq_level = block_modes[0][k][1];
 			uint endpoints_quantized[6];
-			uint weights_quantized[BLOCK_SIZE];
+			uint weights_quantized[ISE_BYTE_COUNT];
+			uint i = 0;
+			for (i = 0; i < ISE_BYTE_COUNT; ++i)
+			{
+				weights_quantized[i] = 0;
+			}
 			encode_rgb(cq_level, ep0.rgb, ep1.rgb, endpoints_quantized);
 			calculate_quantized_weights(texels, wq_level, ep0, ep1, weights_quantized);
 
@@ -374,7 +383,7 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 
 			// compare the decode texels and origin
 			float sum = 0;
-			for (int i = 0; i < BLOCK_SIZE; ++i)
+			for (i = 0; i < BLOCK_SIZE; ++i)
 			{
 				float4 diff = texels[i] - decode_texels[i];
 				float squlen = dot(diff, diff);
@@ -540,7 +549,11 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalph
 	}
 
 	// encode weights
-	uint weights_quantized[BLOCK_SIZE];
+	uint weights_quantized[ISE_BYTE_COUNT];
+	for (i = 0; i < ISE_BYTE_COUNT; ++i)
+	{
+		weights_quantized[i] = 0;
+	}
 	calculate_quantized_weights(texels, weight_quantmethod, ep0, ep1, weights_quantized);
 
 	for (i = 0; i < BLOCK_SIZE; ++i)
