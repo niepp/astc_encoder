@@ -1,12 +1,41 @@
+ /**
+  * Table that describes the number of trits or quints along with bits required
+  * for storing each range.
+  */
+static const uint bits_trits_quints_table[QUANT_MAX * 3] =
+{
+	1, 0, 0,  // RANGE_2
+	0, 1, 0,  // RANGE_3
+	2, 0, 0,  // RANGE_4
+	0, 0, 1,  // RANGE_5
+	1, 1, 0,  // RANGE_6
+	3, 0, 0,  // RANGE_8
+	1, 0, 1,  // RANGE_10
+	2, 1, 0,  // RANGE_12
+	4, 0, 0,  // RANGE_16
+	2, 0, 1,  // RANGE_20
+	3, 1, 0,  // RANGE_24
+	5, 0, 0,  // RANGE_32
+	3, 0, 1,  // RANGE_40
+	4, 1, 0,  // RANGE_48
+	6, 0, 0,  // RANGE_64
+	4, 0, 1,  // RANGE_80
+	5, 1, 0,  // RANGE_96
+	7, 0, 0,  // RANGE_128
+	5, 0, 1,  // RANGE_160
+	6, 1, 0,  // RANGE_192
+	8, 0, 0   // RANGE_256
+};
+
 /**
  * Compute the number of bits required to store a number of items in a specific
  * range using the bounded integer sequence encoding.
  */
 uint compute_ise_bitcount(uint items, uint range)
 {
-	uint bits = bits_trits_quints_table[range][0];
-	uint trits = bits_trits_quints_table[range][1];
-	uint quints = bits_trits_quints_table[range][2];
+	uint bits = bits_trits_quints_table[range * 3 + 0];
+	uint trits = bits_trits_quints_table[range * 3 + 1];
+	uint quints = bits_trits_quints_table[range * 3 + 2];
 
 	if (trits)
 	{
@@ -135,36 +164,36 @@ void encode_trits(uint bitcount,
 	split_high_low(b3, bitcount, t3, m3);
 	split_high_low(b4, bitcount, t4, m4);
 
-	uint packed = integer_from_trits[t4][t3][t2][t1][t0];
+	uint packhigh = integer_from_trits[t4][t3][t2][t1][t0];
 
 	outputs = orbits8_ptr(outputs, outpos, m0, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 1, 0), 2);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 1, 0), 2);
 	outpos += 2;
 
 	outputs = orbits8_ptr(outputs, outpos, m1, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 3, 2), 2);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 3, 2), 2);
 	outpos += 2;
 
 	outputs = orbits8_ptr(outputs, outpos, m2, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 4, 4), 1);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 4, 4), 1);
 	outpos += 1;
 
 	outputs = orbits8_ptr(outputs, outpos, m3, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 6, 5), 2);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 6, 5), 2);
 	outpos += 2;
 
 	outputs = orbits8_ptr(outputs, outpos, m4, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 7, 7), 1);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 7, 7), 1);
 	outpos += 1;
 
 }
@@ -185,24 +214,24 @@ void encode_quints(uint bitcount,
 	split_high_low(b1, bitcount, q1, m1);
 	split_high_low(b2, bitcount, q2, m2);
 
-	uint packed = integer_from_quints[q2][q1][q0];
+	uint packhigh = integer_from_quints[q2][q1][q0];
 
 	outputs = orbits8_ptr(outputs, outpos, m0, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 2, 0), 3);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 2, 0), 3);
 	outpos += 3;
 
 	outputs = orbits8_ptr(outputs, outpos, m1, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 4, 3), 2);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 4, 3), 2);
 	outpos += 2;
 
 	outputs = orbits8_ptr(outputs, outpos, m2, bitcount);
 	outpos += bitcount;
 
-	outputs = orbits8_ptr(outputs, outpos, getbits(packed, 6, 5), 2);
+	outputs = orbits8_ptr(outputs, outpos, getbits(packhigh, 6, 5), 2);
 	outpos += 2;
 
 }
@@ -302,9 +331,9 @@ inline void encode_by_binary(uint numbers[ISE_BYTE_COUNT], uint numcount, uint b
 
 void integer_sequence_encode(uint numbers[ISE_BYTE_COUNT], uint count, uint range, out uint4 outputs, out uint bitpos)
 {
-	uint bits = bits_trits_quints_table[range][0];
-	uint trits = bits_trits_quints_table[range][1];
-	uint quints = bits_trits_quints_table[range][2];
+	uint bits = bits_trits_quints_table[range * 3 + 0];
+	uint trits = bits_trits_quints_table[range * 3 + 1];
+	uint quints = bits_trits_quints_table[range * 3 + 2];
 
 	if (trits == 1)
 	{

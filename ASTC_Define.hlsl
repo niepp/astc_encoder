@@ -1,17 +1,7 @@
 
-#define BLOCK_SIZE_X	4
-#define BLOCK_SIZE_Y	4
-#define BLOCK_SIZE		(BLOCK_SIZE_X * BLOCK_SIZE_Y)
-#define BLOCK_BYTES		16
+#define BLOCK_BYTES	 16
 
 #define ISE_BYTE_COUNT (BLOCK_BYTES + 4)
-
-#define BLOCK_MODE_COUNT 2048
-
-#define MAX_WEIGHTS_PER_BLOCK 64
-#define MIN_WEIGHT_BITS_PER_BLOCK 24
-#define MAX_WEIGHT_BITS_PER_BLOCK 96
-
 #define MAX_WEIGHT_RANGE_NUM 12
 
 #define MAX_ENCODED_WEIGHT_BYTES 12
@@ -26,6 +16,7 @@
 #define CEM_LDR_RGBA_DIRECT 12
 
 /**
+ * form [ARM:astc-encoder]
  * Define normalized (starting at zero) numeric ranges that can be represented
  * with 8 bits or less.
  */
@@ -51,86 +42,6 @@
 #define	QUANT_192 19
 #define	QUANT_256 20
 #define	QUANT_MAX 21
-
-
-// candidate blockmode (weights quantmethod & endpoints quantmethod)
-#define BLOCK_MODE_NUM 10
-static const uint block_modes[2][BLOCK_MODE_NUM][2] =
-{
-	{ // CEM_LDR_RGB_DIRECT
-		{QUANT_3, QUANT_256},
-		{QUANT_4, QUANT_256},
-		{QUANT_5, QUANT_256},
-		{QUANT_6, QUANT_256},
-		{QUANT_8, QUANT_256},
-		{QUANT_12, QUANT_256},
-		{QUANT_16, QUANT_192},
-		{QUANT_20, QUANT_96},
-		{QUANT_24, QUANT_64},
-		{QUANT_32, QUANT_32},
-	},
-
-	{ // CEM_LDR_RGBA_DIRECT
-		{QUANT_3, QUANT_256},
-		{QUANT_4, QUANT_256},
-		{QUANT_5, QUANT_256},
-		{QUANT_6, QUANT_256},
-		{QUANT_8, QUANT_192},
-		{QUANT_12, QUANT_96},
-		{QUANT_16, QUANT_48},
-		{QUANT_20, QUANT_32},
-		{QUANT_24, QUANT_24},
-		{QUANT_32, QUANT_12},
-	}
-};
-
-// endpoint method only use
-/*
-	QUANT_12
-	QUANT_24
-	QUANT_32
-	QUANT_48
-	QUANT_64
-	QUANT_96
-	QUANT_192
-	QUANT_256
-*/
-
-static const uint quant_method_map[] = { 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 1, 2, 255, 3, 4, 255, 5, 255, 255, 6, 7, };
-
-// form [ARM:astc-encoder]
-static const uint weight_quantize_table[] = { 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256 };
-
-
- /**
-  * Table that describes the number of trits or quints along with bits required
-  * for storing each range.
-  */
-static const uint bits_trits_quints_table[QUANT_MAX][3] =
-{
-	{1, 0, 0},  // RANGE_2
-	{0, 1, 0},  // RANGE_3
-	{2, 0, 0},  // RANGE_4
-	{0, 0, 1},  // RANGE_5
-	{1, 1, 0},  // RANGE_6
-	{3, 0, 0},  // RANGE_8
-	{1, 0, 1},  // RANGE_10
-	{2, 1, 0},  // RANGE_12
-	{4, 0, 0},  // RANGE_16
-	{2, 0, 1},  // RANGE_20
-	{3, 1, 0},  // RANGE_24
-	{5, 0, 0},  // RANGE_32
-	{3, 0, 1},  // RANGE_40
-	{4, 1, 0},  // RANGE_48
-	{6, 0, 0},  // RANGE_64
-	{4, 0, 1},  // RANGE_80
-	{5, 1, 0},  // RANGE_96
-	{7, 0, 0},  // RANGE_128
-	{5, 0, 1},  // RANGE_160
-	{6, 1, 0},  // RANGE_192
-	{8, 0, 0}   // RANGE_256
-};
-
 
 uint sum(uint3 color)
 {
@@ -211,4 +122,3 @@ void swap(inout uint lhs, inout uint rhs)
 	lhs = rhs;
 	rhs = tmp;
 }
-

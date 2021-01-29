@@ -83,16 +83,17 @@ HRESULT create_shader(ID3D11Device* pd3dDevice, LPCWSTR srcFile, LPCSTR entryPoi
 }
 
 
+#define THREAD_NUM_X 8
+#define THREAD_NUM_Y 8
+#define BLOCK_SIZE_X 4
+#define BLOCK_SIZE_Y 4
+#define BLOCK_SIZE 16
+
 ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pCubeTexture)
 {
 	const int cFrameRate = 30;
 	const int cWidth = 1280;
 	const int cHeight = 800;
-
-	const int cBlockDimX = 4;
-	const int cBlockDimY = 4;
-	const int cNumthreadX = 8; // same to compute shader [numthreads(8, 8, 1)]
-	const int cNumthreadY = 8;
 
 	float aspectRatio = 1.0f * cWidth / cHeight;
 
@@ -124,6 +125,9 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 
 	pDeviceContext->CSSetShaderResources(0, 1, &pCubeTextureRV);
 
+	int xBlockNum = (TexDesc.Width + BLOCK_SIZE_X - 1) / BLOCK_SIZE_X;
+	int yBlockNum = (TexDesc.Height + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y;
+
 	// unordered access view for output astc buf
 	D3D11_BUFFER_DESC sbOutDesc;
 	sbOutDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
@@ -131,7 +135,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	sbOutDesc.Usage = D3D11_USAGE_DEFAULT;
 	sbOutDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 	sbOutDesc.StructureByteStride = 16;
-	sbOutDesc.ByteWidth = 16 * ((TexDesc.Height + cBlockDimY - 1) / cBlockDimY) * ((TexDesc.Width + cBlockDimX - 1) / cBlockDimX);
+	sbOutDesc.ByteWidth = 16 * xBlockNum * yBlockNum;
 
 	ID3D11Buffer* pOutBuf = nullptr;
 	hr = pd3dDevice->CreateBuffer(&sbOutDesc, nullptr, &pOutBuf);
@@ -173,14 +177,14 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	}
 	pDeviceContext->CSSetConstantBuffers(0, 1, &pConstants);
 
-	int xGroupSize = cBlockDimX * cNumthreadX;
-	int yGroupSize = cBlockDimY * cNumthreadY;
+	int xGroupSize = BLOCK_SIZE_X * THREAD_NUM_X;
+	int yGroupSize = BLOCK_SIZE_Y * THREAD_NUM_Y;
 	int xGroupNum = (TexDesc.Width + xGroupSize - 1) / xGroupSize;
-	int yGroupNum = (TexDesc.Height+ yGroupSize - 1) / yGroupSize;
+	int yGroupNum = (TexDesc.Height + yGroupSize - 1) / yGroupSize;
 
 	CSConstantBuffer ConstBuff;
 	ConstBuff.TexelHeight = TexDesc.Height;
-	ConstBuff.xGroupNum = xGroupNum;
+	ConstBuff.xGroupNum = xBlockNum;
 
 	pDeviceContext->UpdateSubresource(pConstants, 0, 0, &ConstBuff, 0, 0);
 

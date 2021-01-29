@@ -217,8 +217,9 @@ int main()
 	}
 
 	//std::string tcase = "fruit";
-	std::string tcase = "puffin";
+	//std::string tcase = "puffin";
 	//std::string tcase = "blooming";
+	std::string tcase = "leaf";
 
 	std::string src_tex = "F:/work_astc/ASTC_preview/Assets/Resources/";
 //	std::string dst_tex = "F:/work_astc/astc_quality/encode/";
