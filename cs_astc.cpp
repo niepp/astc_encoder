@@ -244,8 +244,8 @@ int main()
 	{
 
 		int row = 0;
-		int col = 8;
-		uint8_t* pd = pMemBuf + (row * 128 + col) * 16;
+		int col = 0;
+		uint8_t* pd = pMemBuf + (row * 256 + col) * 16;
 
 		int nothing = 0;
 

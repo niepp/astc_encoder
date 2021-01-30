@@ -161,12 +161,11 @@ void max_accumulation_pixel_direction(uint4 texels[BLOCK_SIZE], uint hasalpha, o
 		maxdot = dot_a;
 	}
 
-	vec_k = normalize(vec_k);
+	float lenk = length(vec_k);
+	vec_k = (lenk < SMALL_VALUE) ? vec_k : normalize(vec_k);
 
-	if (vec_k.x + vec_k.y + vec_k.z < 0.0f)
-	{
-		vec_k = -vec_k;
-	}
+	float sumk = vec_k.x + vec_k.y + vec_k.z;
+	vec_k = (sumk < 0.0f) ? -vec_k : vec_k;
 
 	float a = 1e31;
 	float b = -1e31;
@@ -180,7 +179,7 @@ void max_accumulation_pixel_direction(uint4 texels[BLOCK_SIZE], uint hasalpha, o
 
 	e0 = clamp(vec_k * a + pt_mean, 0.0, 255.0);
 	e1 = clamp(vec_k * b + pt_mean, 0.0, 255.0);
-	
+
 	if (hasalpha == 0)
 	{
 		e0.a = 255.0;
