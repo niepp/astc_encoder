@@ -29,26 +29,26 @@ RWStructuredBuffer<uint4> OutBuffer;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calc the dominant axis
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-float4 mean(uint4 texels[BLOCK_SIZE], uint count)
+float4 mean(int4 texels[BLOCK_SIZE], int count)
 {
 	float4 sum = float4(0, 0, 0, 0);
-	for (uint i = 0; i < count; ++i)
+	for (int i = 0; i < count; ++i)
 	{
 		sum += texels[i];
 	}
 	return sum / count;
 }
 
-float4x4 covariance(float4 m[BLOCK_SIZE], uint count)
+float4x4 covariance(float4 m[BLOCK_SIZE], int count)
 {
 	float inv = 1.0 / (count - 1);
 	float4x4 cov;
-	for (uint i = 0; i < 4; ++i)
+	for (int i = 0; i < 4; ++i)
 	{
-		for (uint j = 0; j < 4; ++j)
+		for (int j = 0; j < 4; ++j)
 		{
 			float s = 0;
-			for (uint k = 0; k < count; ++k)
+			for (int k = 0; k < count; ++k)
 			{
 				float4 p = m[k];
 				s += p[i] * p[j];
@@ -63,7 +63,7 @@ float4 eigen_vector(float4x4 m)
 {
 	// calc the max eigen value by iteration
 	float4 v = normalize(float4(1, 3, 2, 0));
-	for (uint i = 0; i < 8; ++i)
+	for (int i = 0; i < 8; ++i)
 	{
 		v = mul(m, v);
 		if (length(v) < SMALL_VALUE)
@@ -75,12 +75,12 @@ float4 eigen_vector(float4x4 m)
 	return v;
 }
 
-void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint hasalpha, out float4 e0, out float4 e1)
+void principal_component_analysis(int4 texels[BLOCK_SIZE], int hasalpha, out float4 e0, out float4 e1)
 {
 	float4 pt_mean = mean(texels, BLOCK_SIZE);
 
 	float4 sub[BLOCK_SIZE];
-	uint i = 0;
+	int i = 0;
 	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
 		sub[i] = texels[i] - pt_mean;
@@ -116,8 +116,7 @@ void principal_component_analysis(uint4 texels[BLOCK_SIZE], uint hasalpha, out f
 	}
 
 }
-
-void max_accumulation_pixel_direction(uint4 texels[BLOCK_SIZE], uint hasalpha, out float4 e0, out float4 e1)
+void max_accumulation_pixel_direction(int4 texels[BLOCK_SIZE], int hasalpha, out float4 e0, out float4 e1)
 {
 	float4 pt_mean = mean(texels, BLOCK_SIZE);
 
@@ -126,7 +125,7 @@ void max_accumulation_pixel_direction(uint4 texels[BLOCK_SIZE], uint hasalpha, o
 	float4 sum_b = float4(0,0,0,0);
 	float4 sum_a = float4(0,0,0,0);
 	UNROLL
-	for (uint i = 0; i < BLOCK_SIZE; ++i)
+	for (int i = 0; i < BLOCK_SIZE; ++i)
 	{
 		float4 dt = texels[i] - pt_mean;
 		sum_r += (dt.x > 0) ? dt : 0;
@@ -190,9 +189,9 @@ void max_accumulation_pixel_direction(uint4 texels[BLOCK_SIZE], uint hasalpha, o
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // quantize & unquantize the endpoints
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-uint4 quantize_color(uint qm_index, uint4 c)
+int4 quantize_color(int qm_index, int4 c)
 {
-	uint4 result;
+	int4 result;
 	result.r = color_quantize_table[qm_index * COLOR_QUANTIZE_NUM + c.r];
 	result.g = color_quantize_table[qm_index * COLOR_QUANTIZE_NUM + c.g];
 	result.b = color_quantize_table[qm_index * COLOR_QUANTIZE_NUM + c.b];
@@ -200,9 +199,9 @@ uint4 quantize_color(uint qm_index, uint4 c)
 	return result;
 }
 
-uint4 unquantize_color(uint qm_index, uint4 c)
+int4 unquantize_color(int qm_index, int4 c)
 {
-	uint4 result;
+	int4 result;
 	result.r = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + c.r];
 	result.g = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + c.g];
 	result.b = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + c.b];
@@ -210,13 +209,13 @@ uint4 unquantize_color(uint qm_index, uint4 c)
 	return result;
 }
 
-void encode_color(uint qm_index, float4 e0, float4 e1, out uint endpoint_quantized[8])
+void encode_color(int qm_index, float4 e0, float4 e1, out int endpoint_quantized[8])
 {
-	uint4 e0q = quantize_color(qm_index, round(e0));
-	uint4 e1q = quantize_color(qm_index, round(e1));
+	int4 e0q = quantize_color(qm_index, round(e0));
+	int4 e1q = quantize_color(qm_index, round(e1));
 
-	uint4 e0u = unquantize_color(qm_index, e0q);
-	uint4 e1u = unquantize_color(qm_index, e1q);
+	int4 e0u = unquantize_color(qm_index, e0q);
+	int4 e1u = unquantize_color(qm_index, e1q);
 
 	// Sort the endpoints to ensure that the normal encoding is used.
 	if (sum(e0u.rgb) > sum(e1u.rgb))
@@ -234,7 +233,7 @@ void encode_color(uint qm_index, float4 e0, float4 e1, out uint endpoint_quantiz
 	endpoint_quantized[7] = e1q.a;
 }
 
-void decode_color(uint qm_index, uint endpoint_quantized[8], out float4 e0, out float4 e1)
+void decode_color(int qm_index, int endpoint_quantized[8], out float4 e0, out float4 e1)
 {
 	int ir0 = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + endpoint_quantized[0]];
 	int ir1 = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + endpoint_quantized[1]];
@@ -245,15 +244,12 @@ void decode_color(uint qm_index, uint endpoint_quantized[8], out float4 e0, out 
 	int a0 = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + endpoint_quantized[6]];
 	int a1 = color_unquantize_table[qm_index * COLOR_QUANTIZE_NUM + endpoint_quantized[7]];
 
+	e0 = float4(ir0, ig0, ib0, a0);
+	e1 = float4(ir1, ig1, ib1, a1);
+
 	if (ir0 + ig0 + ib0 > ir1 + ig1 + ib1)
 	{
-		e0 = float4(ir1, ig1, ib1, a1);
-		e1 = float4(ir0, ig0, ib0, a0);
-	}
-	else
-	{
-		e0 = float4(ir0, ig0, ib0, a0);
-		e1 = float4(ir1, ig1, ib1, a1);
+		swap(e0, e1);
 	}
 
 }
@@ -262,31 +258,33 @@ void decode_color(uint qm_index, uint endpoint_quantized[8], out float4 e0, out 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calculate quantized weights
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-uint quantize_weight(uint weight_range, float weight)
+int quantize_weight(int weight_range, float weight)
 {
-	uint r = (weight_range - 1);
+	int r = (weight_range - 1);
 	float u = clamp(weight, 0.0, 1.0) * r;
-	uint q = (uint)(u + 0.5);
+	int q = round(u);
 	return clamp(q, 0, r);
 }
 
-float unquantize_weight(uint weight_range, uint qw)
+float unquantize_weight(int weight_range, int qw)
 {
 	float w = 1.0 * qw / (weight_range - 1);
 	return clamp(w, 0.0, 1.0);
 }
 
-void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
-	uint weight_range,
+void calculate_quantized_weights(int4 texels[BLOCK_SIZE],
+	int weight_range,
 	float4 ep0,
 	float4 ep1,
-	inout uint weights[ISE_BYTE_COUNT])
+	inout int weights[16])
 {
+	int i = 0;
 	float4 vec_k = ep1 - ep0;
-	uint squdist = dot(vec_k, vec_k);
+	int squdist = dot(vec_k, vec_k);
 	if (squdist == 0)
 	{
-		for (uint i = 0; i < BLOCK_SIZE; ++i)
+		UNROLL
+		for (i = 0; i < 16; ++i)
 		{
 			weights[i] = 0;
 		}
@@ -297,7 +295,8 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 		float minw = 1e31;
 		float maxw = -1e31;
 		float projw[BLOCK_SIZE];
-		uint i = 0;
+
+		UNROLL
 		for (i = 0; i < BLOCK_SIZE; ++i)
 		{
 			projw[i] = dot(vec_k, texels[i] - ep0);
@@ -308,15 +307,17 @@ void calculate_quantized_weights(uint4 texels[BLOCK_SIZE],
 		float len = maxw - minw;
 		len = max(SMALL_VALUE, len);
 		float invlen = 1.0 / len;
-		for (i = 0; i < BLOCK_SIZE; ++i)
+		UNROLL
+		for (i = 0; i < 16; ++i)
 		{
 			weights[i] = quantize_weight(weight_range, (projw[i] - minw) * invlen);
 		}
 	}
 }
 
-void lerp_colors_by_weights(uint weights_quantized[ISE_BYTE_COUNT], uint weight_range, float4 ep0, float4 ep1, out float4 decode_texels[BLOCK_SIZE])
+void lerp_colors_by_weights(int weights_quantized[16], int weight_range, float4 ep0, float4 ep1, out float4 decode_texels[BLOCK_SIZE])
 {
+	UNROLL
 	for (int i = 0; i < BLOCK_SIZE; ++i)
 	{
 		float w = unquantize_weight(weight_range, weights_quantized[i]);
@@ -329,58 +330,52 @@ void lerp_colors_by_weights(uint weights_quantized[ISE_BYTE_COUNT], uint weight_
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // encode single partition
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// candidate blockmode uint4(weights quantmethod, endpoints quantmethod, weights range, endpoints quantmethod index of table)
+// candidate blockmode int4(weights quantmethod, endpoints quantmethod, weights range, endpoints quantmethod index of table)
 
 #define BLOCK_MODE_NUM 10
-static const uint4 block_modes[2][BLOCK_MODE_NUM] =
+static const int4 block_modes[2][BLOCK_MODE_NUM] =
 {
 	{ // CEM_LDR_RGB_DIRECT
-		uint4(QUANT_3, QUANT_256, 3, 7),
-		uint4(QUANT_4, QUANT_256, 4, 7),
-		uint4(QUANT_5, QUANT_256, 5, 7),
-		uint4(QUANT_6, QUANT_256, 6, 7),
-		uint4(QUANT_8, QUANT_256, 8, 7),
-		uint4(QUANT_12, QUANT_256, 12, 7),
-		uint4(QUANT_16, QUANT_192, 16, 6),
-		uint4(QUANT_20, QUANT_96, 20, 5),
-		uint4(QUANT_24, QUANT_64, 24, 4),
-		uint4(QUANT_32, QUANT_32, 32, 2),
+		int4(QUANT_3, QUANT_256, 3, 7),
+		int4(QUANT_4, QUANT_256, 4, 7),
+		int4(QUANT_5, QUANT_256, 5, 7),
+		int4(QUANT_6, QUANT_256, 6, 7),
+		int4(QUANT_8, QUANT_256, 8, 7),
+		int4(QUANT_12, QUANT_256, 12, 7),
+		int4(QUANT_16, QUANT_192, 16, 6),
+		int4(QUANT_20, QUANT_96, 20, 5),
+		int4(QUANT_24, QUANT_64, 24, 4),
+		int4(QUANT_32, QUANT_32, 32, 2),
 	},
 
 	{ // CEM_LDR_RGBA_DIRECT
-		uint4(QUANT_3, QUANT_256, 3, 7),
-		uint4(QUANT_4, QUANT_256, 4, 7),
-		uint4(QUANT_5, QUANT_256, 5, 7),
-		uint4(QUANT_6, QUANT_256, 6, 7),
-		uint4(QUANT_8, QUANT_192, 8, 6),
-		uint4(QUANT_12, QUANT_96, 12, 5),
-		uint4(QUANT_16, QUANT_48, 16, 3),
-		uint4(QUANT_20, QUANT_32, 20, 2),
-		uint4(QUANT_24, QUANT_24, 24, 1),
-		uint4(QUANT_32, QUANT_12, 32, 0),
+		int4(QUANT_3, QUANT_256, 3, 7),
+		int4(QUANT_4, QUANT_256, 4, 7),
+		int4(QUANT_5, QUANT_256, 5, 7),
+		int4(QUANT_6, QUANT_256, 6, 7),
+		int4(QUANT_8, QUANT_192, 8, 6),
+		int4(QUANT_12, QUANT_96, 12, 5),
+		int4(QUANT_16, QUANT_48, 16, 3),
+		int4(QUANT_20, QUANT_32, 20, 2),
+		int4(QUANT_24, QUANT_24, 24, 1),
+		int4(QUANT_32, QUANT_12, 32, 0),
 	}
 };
 
 
-void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, uint hasalpha, out uint4 best_blockmode)
+void choose_best_quantmethod(int4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, int hasalpha, out int4 best_blockmode)
 {
 	float minerr = 1e31;
 	UNROLL
 	for (int k = 0; k < BLOCK_MODE_NUM; ++k)
 	{
 		// encode
-		uint4 blockmode = (hasalpha > 0) ? block_modes[1][k] : block_modes[0][k];		
-		uint wt_range = blockmode.z;
-		uint cq_index = blockmode.w;
+		int4 blockmode = (hasalpha > 0) ? block_modes[1][k] : block_modes[0][k];		
+		int wt_range = blockmode.z;
+		int cq_index = blockmode.w;
 
-		uint endpoints_quantized[8];
-		uint weights_quantized[ISE_BYTE_COUNT];
-		uint i = 0;
-		UNROLL
-		for (i = 0; i < ISE_BYTE_COUNT; ++i)
-		{
-			weights_quantized[i] = 0;
-		}
+		int endpoints_quantized[8];
+		int weights_quantized[16];
 		encode_color(cq_index, ep0, ep1, endpoints_quantized);
 		calculate_quantized_weights(texels, wt_range, ep0, ep1, weights_quantized);
 
@@ -394,7 +389,7 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 		// compare the decode texels and origin
 		float sum = 0;
 		UNROLL
-		for (i = 0; i < BLOCK_SIZE; ++i)
+		for (int i = 0; i < BLOCK_SIZE; ++i)
 		{
 			float4 diff = texels[i] - decode_texels[i];
 			float squlen = dot(diff, diff);
@@ -411,57 +406,58 @@ void choose_best_quantmethod(uint4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, u
 
 }
 
-uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_count, uint partition_index, uint4 ep_ise, uint ep_bitcnt, uint4 wt_ise, uint wt_bitcnt)
+int4 assemble_block(int blockmode, int color_endpoint_mode, int partition_count, int partition_index, int4 ep_ise, int ep_bitcnt, int4 wt_ise, int wt_bitcnt)
 {
 
-	uint weights[16];
-	uint4_2_array16(wt_ise, weights);
+	int weights[16];
+	int4_2_array16(wt_ise, weights);
 
-	uint i = 0;
-	uint j = MAX_ENCODED_WEIGHT_BYTES - 1;
-	
+	int i = 0;
+	int j = MAX_ENCODED_WEIGHT_BYTES - 1;
+	UNROLL
 	for (; i < j; ++i, --j)
 	{
 		swap(weights[i], weights[j]);
 	}
 	
+	UNROLL
 	for (i = 0; i < MAX_ENCODED_WEIGHT_BYTES; ++i)
 	{
 		weights[i] = reverse_byte(weights[i]);
 	}
 
-	
+	UNROLL
 	for (i = BLOCK_BYTES - 1; i >= BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES; --i)
 	{
 		weights[i] = weights[i - (BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES)];
 	}
 
-	
+	UNROLL
 	for (i = 0; i < BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES; ++i)
 	{
 		weights[i] = 0;
 	}
 
-	uint4 phy_blk = array16_2_uint4(weights);
+	int4 phy_blk = array16_2_int4(weights);
 	phy_blk = orbits8_ptr(phy_blk, 0, blockmode & 0xFF, 8);
 	phy_blk = orbits8_ptr(phy_blk, 8, (blockmode >> 8) & 0xFF, 3);
 
-	uint multi = partition_count > 1 ? 1 : 0;
+	int multi = partition_count > 1 ? 1 : 0;
 
-	uint part_value = partition_count - 1;
-	uint part_index = multi * partition_index;
+	int part_value = partition_count - 1;
+	int part_index = multi * partition_index;
 	phy_blk = orbits8_ptr(phy_blk, 11, part_value, 2);
 
-	if (partition_count > 1)
-	{
-		phy_blk = orbits8_ptr(phy_blk, 13, part_index & 63, 6);
-		phy_blk = orbits8_ptr(phy_blk, 19, part_index >> 6, 4);
-	}
+//	if (partition_count > 1)
+//	{
+//		phy_blk = orbits8_ptr(phy_blk, 13, part_index & 63, 6);
+//		phy_blk = orbits8_ptr(phy_blk, 19, part_index >> 6, 4);
+//	}
 
 	// CEM	
-	uint cem_offset = multi * 10 + 13;
-	uint endpoint_offset = multi * 12 + 17;
-	uint cem_bits = multi * 2 + 4;
+	int cem_offset = multi * 10 + 13;
+	int endpoint_offset = multi * 12 + 17;
+	int cem_bits = multi * 2 + 4;
 
 	phy_blk = orbits8_ptr(phy_blk, cem_offset, color_endpoint_mode, cem_bits);
 
@@ -472,20 +468,17 @@ uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_co
 
 }
 
-uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalpha)
+int4 encode_block(int4 texels[BLOCK_SIZE], int hasalpha)
 {
 	float4 ep0, ep1;
 	//principal_component_analysis(texels, hasalpha, ep0, ep1);
 	max_accumulation_pixel_direction(texels, hasalpha, ep0, ep1);
 
+
+
 	// for single partition
-	uint partition_index = 0;
-	uint partition_count = 1;
-
-	uint x_grids = 4;
-	uint y_grids = 4;
-
-	uint weights_count = x_grids * y_grids; // weights count equal to pixels count
+	int partition_index = 0;
+	int partition_count = 1;
 
 /*
 	the first row of "Table C.2.8 - 2D Block Mode Layout".
@@ -495,90 +488,83 @@ uint4 encode_single_partition(uint4 texels[BLOCK_SIZE], uint count, uint hasalph
 	D   H     B       A     R0  0   0   R2  R1  B + 4   A + 2
 */
 
-	uint a = y_grids - 2;
-	uint b = x_grids - 4;
+	uint a = Y_GRIDS - 2;
+	uint b = X_GRIDS - 4;
 
 	a &= 0x3;
 	b &= 0x3;
 
 	uint d = 0;  // dual plane
 
-	uint4 best_blockmode = hasalpha ? uint4(QUANT_8, QUANT_192, 8, 6) : uint4(QUANT_8, QUANT_256, 8, 7);
+	int4 best_blockmode = hasalpha ? int4(QUANT_8, QUANT_192, 8, 6) : int4(QUANT_8, QUANT_256, 8, 7);
 	choose_best_quantmethod(texels, ep0, ep1, hasalpha, best_blockmode);
 
 	// endpoints_quant是根据整个128bits减去weights的编码占用和其他配置占用后剩余的bits位数来确定的。
-	uint weight_quantmethod = best_blockmode.x;
-	uint endpoint_quantmethod = best_blockmode.y;
-	uint weight_range = best_blockmode.z;
-	uint colorquant_index = best_blockmode.w;
-	
-	uint color_endpoint_mode = (hasalpha > 0) ? CEM_LDR_RGBA_DIRECT : CEM_LDR_RGB_DIRECT;
+	int weight_quantmethod = best_blockmode.x;
+	int endpoint_quantmethod = best_blockmode.y;
+	int weight_range = best_blockmode.z;
+	int colorquant_index = best_blockmode.w;
+
+	int color_endpoint_mode = (hasalpha > 0) ? CEM_LDR_RGBA_DIRECT : CEM_LDR_RGB_DIRECT;
 
 	// reference from arm astc encoder "symbolic_to_physical"
-	uint bytes_of_one_endpoint = 2 * (color_endpoint_mode >> 2) + 2;
+	int bytes_of_one_endpoint = 2 * (color_endpoint_mode >> 2) + 2;
 
-	// r & h value
 	// more details from "Table C.2.7 - Weight Range Encodings"
 	// "a precision bit H"
+	const uint h_table[MAX_WEIGHT_RANGE_NUM] = { 0, 0, 0, 0, 0, 0,
+												 1, 1, 1, 1, 1, 1 };
+
 	// "The weight ranges are encoded using a 3 bit value R"
-	uint h = (weight_quantmethod < 6) ? 0 : 1;
-	uint r = (weight_quantmethod % 6) + 2;
+	const uint r_table[MAX_WEIGHT_RANGE_NUM] = { 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+												 0x2, 0x3, 0x4, 0x5, 0x6, 0x7 };
+
+	uint h = h_table[weight_quantmethod];
+	uint r = r_table[weight_quantmethod];
 
 	// block mode
-	uint blockmode = (r >> 1) & 0x3;
+	int blockmode = (r >> 1) & 0x3;
 	blockmode |= (r & 0x1) << 4;
 	blockmode |= (a & 0x3) << 5;
 	blockmode |= (b & 0x3) << 7;
 	blockmode |= h << 9;
 	blockmode |= d << 10;
 
-	uint endpoints_quantized[ISE_BYTE_COUNT];
-	uint i = 0;
-	UNROLL
-	for (i = 0; i < ISE_BYTE_COUNT; ++i)
-	{
-		endpoints_quantized[i] = 0;
-	}
+	int i = 0;
 
 	// encode endpoints
-	uint ep_quantized[8];
-	encode_color(colorquant_index, ep0, ep1, ep_quantized);
-	UNROLL
-	for (i = 0; i < 8; ++i)
-	{
-		endpoints_quantized[i] = ep_quantized[i];
-	}
+	int endpoints_quantized[8];
+	encode_color(colorquant_index, ep0, ep1, endpoints_quantized);
 
 	// encode weights
-	uint weights_quantized[ISE_BYTE_COUNT];
-	UNROLL
-	for (i = 0; i < ISE_BYTE_COUNT; ++i)
-	{
-		weights_quantized[i] = 0;
-	}
+	int weights_quantized[16];
 	calculate_quantized_weights(texels, weight_range, ep0, ep1, weights_quantized);
 
 	UNROLL
-	for (i = 0; i < BLOCK_SIZE; ++i)
+	for (i = 0; i < 16; ++i)
 	{
 		weights_quantized[i] = scramble_table[weight_quantmethod * WEIGHT_QUANTIZE_NUM + weights_quantized[i]];
 	}
 
 	// endpoints_quantized ise encode
-	uint4 ep_ise;
-	uint ep_bitcnt = 0;
-	uint ep_bytecnt = (hasalpha > 0) ? 8 : 6;
-	integer_sequence_encode(endpoints_quantized, ep_bytecnt, endpoint_quantmethod, ep_ise, ep_bitcnt);
+	int4 ep_ise;
+	int ep_bitcnt = 0;
+	bise_endpoints(endpoints_quantized, hasalpha, endpoint_quantmethod, ep_ise, ep_bitcnt);
 
 	// weights_quantized ise encode
-	uint4 wt_ise;
-	uint wt_bitcnt = 0;
-	integer_sequence_encode(weights_quantized, weights_count, weight_quantmethod, wt_ise, wt_bitcnt);
+	int4 wt_ise;
+	int wt_bitcnt = 0;
+	bise_weights(weights_quantized, weight_quantmethod, wt_ise, wt_bitcnt);
 
+//	return array16_2_int4(weights_quantized);
+
+	//return wt_ise;
+	 
 	// assemble to astcblock
 	return assemble_block(blockmode, color_endpoint_mode, partition_count, partition_index, ep_ise, ep_bitcnt, wt_ise, wt_bitcnt);
 
 }
+
 
 [numthreads(THREAD_NUM_X, THREAD_NUM_Y, 1)] // 一个group里的thread数目
 void MainCS(
@@ -588,32 +574,33 @@ void MainCS(
 	uint3 DTid : SV_DispatchThreadID,	// DispatchThreadID = (GroupID X numthreads) + GroupThreadID
 	uint Gidx : SV_GroupIndex)			// group里的thread坐标展开后的索引
 {
-	// DTid.xy 就是block坐标（第几个block）
+// DTid.xy 就是block坐标（第几个block）
 
 	uint2 blockPos = DTid.xy;
 
-	uint2 blockSize = uint2(BLOCK_SIZE_X, BLOCK_SIZE_Y);
+	int2 blockSize = uint2(BLOCK_SIZE_X, BLOCK_SIZE_Y);
 
-	uint4 texels[BLOCK_SIZE];
-	uint hasalpha = 0;
-	uint i = 0;
+	int4 texels[BLOCK_SIZE];
+	int hasalpha = 0;
+	int i = 0;
 	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
-		uint y = i / BLOCK_SIZE_X;
-		uint x = i - y * BLOCK_SIZE_X;
-		uint2 localPos = uint2(x, y);
-		uint3 pixelPos = uint3(blockPos * blockSize + localPos, 0);
+		int y = i / BLOCK_SIZE_X;
+		int x = i - y * BLOCK_SIZE_X;
+		int2 localPos = uint2(x, y);
+		int3 pixelPos = uint3(blockPos * blockSize + localPos, 0);
 		pixelPos.y = InTexelHeight - 1 - pixelPos.y;
-		uint4 pixel = InTexture.Load(pixelPos) * 255;
+		int4 pixel = InTexture.Load(pixelPos) * 255;
 		pixel = clamp(pixel, 0, 255);
 		hasalpha |= (pixel.a != 255) ? 1 : 0;
 		texels[i] = pixel;
 	}
 
-	uint4 phy_blk = encode_single_partition(texels, BLOCK_SIZE, hasalpha);
+	int4 phy_blk = encode_block(texels, hasalpha);
 
 	//uint blockID = blockPos.y * InGroupNumX * THREAD_NUM_X + blockPos.x;
 	uint blockID = blockPos.y * 256 + blockPos.x;
 	OutBuffer[blockID] = phy_blk;
 
 }
+

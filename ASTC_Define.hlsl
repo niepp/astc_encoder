@@ -1,6 +1,10 @@
 
 #define BLOCK_BYTES	 16
 
+#define X_GRIDS 4
+#define Y_GRIDS 4
+
+
 #define ISE_BYTE_COUNT (BLOCK_BYTES + 4)
 #define MAX_WEIGHT_RANGE_NUM 12
 
@@ -43,32 +47,32 @@
 #define	QUANT_256 20
 #define	QUANT_MAX 21
 
-uint sum(uint3 color)
+int sum(int3 color)
 {
 	return color.r + color.g + color.b;
 }
 
-float3 to_float3(uint3 color)
+float3 to_float3(int3 color)
 {
 	return float3(color.r, color.g, color.b);
 }
 
-uint3 to_int3(float3 color)
+int3 to_int3(float3 color)
 {
-	return uint3(color.r, color.g, color.b);
+	return int3(color.r, color.g, color.b);
 }
 
-float4 to_float4(uint4 color)
+float4 to_float4(int4 color)
 {
 	return float4(color.r, color.g, color.b, color.a);
 }
 
-uint4 to_int4(float4 color)
+int4 to_int4(float4 color)
 {
-	return uint4(color.r, color.g, color.b, color.a);
+	return int4(color.r, color.g, color.b, color.a);
 }
 
-uint4 array16_2_uint4(uint inputs[16])
+int4 array16_2_int4(int inputs[16])
 {
 	uint4 outputs = 0;
 	outputs.x = (inputs[0]) | (inputs[1] << 8) | (inputs[2] << 16) | (inputs[3] << 24);
@@ -78,7 +82,7 @@ uint4 array16_2_uint4(uint inputs[16])
 	return outputs;
 }
 
-void uint4_2_array16(uint4 src, out uint dst[16])
+void int4_2_array16(int4 src, out int dst[16])
 {
 	dst[0] = src.x & 0xFF;
 	dst[1] = (src.x >> 8) & 0xFF;
@@ -102,23 +106,23 @@ void uint4_2_array16(uint4 src, out uint dst[16])
 
 }
 
-void swap(inout uint4 lhs, inout uint4 rhs)
+void swap(inout int4 lhs, inout int4 rhs)
 {
-	uint4 tmp = lhs;
+	int4 tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }
 
-void swap(inout uint3 lhs, inout uint3 rhs)
+void swap(inout float4 lhs, inout float4 rhs)
 {
-	uint3 tmp = lhs;
+	float4 tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }
 
-void swap(inout uint lhs, inout uint rhs)
+void swap(inout int lhs, inout int rhs)
 {
-	uint tmp = lhs;
+	int tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }

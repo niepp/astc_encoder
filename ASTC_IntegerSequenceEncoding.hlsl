@@ -2,7 +2,7 @@
   * Table that describes the number of trits or quints along with bits required
   * for storing each range.
   */
-static const uint bits_trits_quints_table[QUANT_MAX * 3] =
+static const int bits_trits_quints_table[QUANT_MAX * 3] =
 {
 	1, 0, 0,  // RANGE_2
 	0, 1, 0,  // RANGE_3
@@ -31,11 +31,11 @@ static const uint bits_trits_quints_table[QUANT_MAX * 3] =
  * Compute the number of bits required to store a number of items in a specific
  * range using the bounded integer sequence encoding.
  */
-uint compute_ise_bitcount(uint items, uint range)
+int compute_ise_bitcount(int items, int range)
 {
-	uint bits = bits_trits_quints_table[range * 3 + 0];
-	uint trits = bits_trits_quints_table[range * 3 + 1];
-	uint quints = bits_trits_quints_table[range * 3 + 2];
+	int bits = bits_trits_quints_table[range * 3 + 0];
+	int trits = bits_trits_quints_table[range * 3 + 1];
+	int quints = bits_trits_quints_table[range * 3 + 2];
 
 	if (trits)
 	{
@@ -51,63 +51,63 @@ uint compute_ise_bitcount(uint items, uint range)
 }
 
 // 取第n个bit位的值
-uint getbit(uint number, uint n)
+int getbit(int number, int n)
 {
 	return (number >> n) & 1;
 }
 
 // 取第lsb到msb的这几个bit位的值
-uint getbits(uint number, uint msb, uint lsb)
+int getbits(int number, int msb, int lsb)
 {
-	uint count = msb - lsb + 1;
+	int count = msb - lsb + 1;
 	return (number >> lsb) & ((1 << count) - 1);
 }
 
 // 把number的低bitcount位写到bytes的bitoffset偏移处开始的位置
 // number must be <= 255; bitcount must be <= 8
-uint4 orbits8_ptr(uint4 bytes, uint bitoffset, uint number, uint bitcount)
+int4 orbits8_ptr(int4 bytes, int bitoffset, int number, int bitcount)
 {
-	uint4 retv = bytes;
+	int4 retv = bytes;
 	bitcount = bitcount > 8 ? 8 : bitcount;
 	number &= (1 << bitcount) - 1;
 
-	uint newpos = bitoffset + bitcount;
+	int newpos = bitoffset + bitcount;
 	if (bitoffset < 32)
 	{
-		uint lowpart = bitoffset > 0 ? number & ((1 << (32 - bitoffset)) - 1) : number;
+		int lowpart = bitoffset > 0 ? number & ((1 << (32 - bitoffset)) - 1) : number;
 		retv.x = bytes.x | (lowpart << bitoffset);
 
-		uint highpart = newpos > 32 ? number >> (32 - bitoffset) : 0;
+		int highpart = newpos > 32 ? number >> (32 - bitoffset) : 0;
 		retv.y = bytes.y | highpart;
 	}
 	else if (bitoffset < 64)
 	{
-		uint lowpart = bitoffset > 32 ? number & ((1 << (64 - bitoffset)) - 1) : number;
+		int lowpart = bitoffset > 32 ? number & ((1 << (64 - bitoffset)) - 1) : number;
 		retv.y = bytes.y | (lowpart << (bitoffset - 32));
 
-		uint highpart = newpos > 64 ? number >> (64 - bitoffset) : 0;
+		int highpart = newpos > 64 ? number >> (64 - bitoffset) : 0;
 		retv.z = bytes.z | highpart;
 	}
 	else if (bitoffset < 96)
 	{
-		uint lowpart = bitoffset > 64 ? number & ((1 << (96 - bitoffset)) - 1) : number;
+		int lowpart = bitoffset > 64 ? number & ((1 << (96 - bitoffset)) - 1) : number;
 		retv.z = bytes.z | (lowpart << (bitoffset - 64));
 
-		uint highpart = newpos > 96 ? number >> (96 - bitoffset) : 0;
+		int highpart = newpos > 96 ? number >> (96 - bitoffset) : 0;
 		retv.w = bytes.w | highpart;
 	}
 	else
 	{
-		uint lowpart = bitoffset > 96 ? number & ((1 << (128 - bitoffset)) - 1) : number;
+		int lowpart = bitoffset > 96 ? number & ((1 << (128 - bitoffset)) - 1) : number;
 		retv.w = bytes.w | (lowpart << (bitoffset - 96));
 	}
 
 	return retv;
 }
 
-void split_high_low(uint n, uint i, out uint high, out uint low)
+void split_high_low(int n, int i, out int high, out int low)
 {
-	uint low_mask = (uint)((1 << i) - 1) & 0xFF;
+	int low_mask = ((1 << i) - 1) & 0xFF;
 	low = n & low_mask;
 	high = (n >> i) & 0xFF;
 }
@@ -116,7 +116,7 @@ void split_high_low(uint n, uint i, out uint high, out uint low)
 /**
  * Reverse bits of a byte.
  */
-uint reverse_byte(uint p)
+int reverse_byte(int p)
 {
 	p = ((p & 0xF) << 4) | ((p >> 4) & 0xF);
 	p = ((p & 0x33) << 2) | ((p >> 2) & 0x33);
@@ -125,12 +125,12 @@ uint reverse_byte(uint p)
 }
 
 
-void copy_bytes(uint4 source, uint bytecount, inout uint4 target, inout uint bitoffset)
+void copy_bytes(int4 source, int bytecount, inout int4 target, inout int bitoffset)
 {
-	uint4 outbytes = target;
-	uint src_bytes[16];
-	uint4_2_array16(source, src_bytes);
-	for (uint i = 0; i < bytecount; ++i)
+	int4 outbytes = target;
+	int src_bytes[16];
+	int4_2_array16(source, src_bytes);
+	for (int i = 0; i < bytecount; ++i)
 	{
 		outbytes = orbits8_ptr(outbytes, bitoffset + i * 8, src_bytes[i], 8);
 	}
@@ -138,25 +138,19 @@ void copy_bytes(uint4 source, uint bytecount, inout uint4 target, inout uint bit
 	bitoffset += bytecount * 8;
 }
 
-//void write8(inout uint4 outputs, inout uint bitoffset, uint number, uint bitcount)
-//{
-//	orbits8_ptr(outputs, bitoffset, number, bitcount);
-//	bitoffset += bitcount;
-//}
-
 /**
  * Encode a group of 5 numbers using trits and bits.
  */
-void encode_trits(uint bitcount,
-	uint b0,
-	uint b1,
-	uint b2,
-	uint b3,
-	uint b4,
-	inout uint4 outputs, inout uint outpos)
+void encode_trits(int bitcount,
+	int b0,
+	int b1,
+	int b2,
+	int b3,
+	int b4,
+	inout int4 outputs, inout int outpos)
 {
-	uint t0, t1, t2, t3, t4;
-	uint m0, m1, m2, m3, m4;
+	int t0, t1, t2, t3, t4;
+	int m0, m1, m2, m3, m4;
 
 	split_high_low(b0, bitcount, t0, m0);
 	split_high_low(b1, bitcount, t1, m1);
@@ -164,7 +158,7 @@ void encode_trits(uint bitcount,
 	split_high_low(b3, bitcount, t3, m3);
 	split_high_low(b4, bitcount, t4, m4);
 
-	uint packhigh = integer_from_trits[t4][t3][t2][t1][t0];
+	int packhigh = integer_from_trits[t4][t3][t2][t1][t0];
 
 	outputs = orbits8_ptr(outputs, outpos, m0, bitcount);
 	outpos += bitcount;
@@ -201,20 +195,20 @@ void encode_trits(uint bitcount,
 /**
  * Encode a group of 3 numbers using quints and bits.
  */
-void encode_quints(uint bitcount,
-	uint b0,
-	uint b1,
-	uint b2,
-	inout uint4 outputs, inout uint outpos)
+void encode_quints(int bitcount,
+	int b0,
+	int b1,
+	int b2,
+	inout int4 outputs, inout int outpos)
 {
-	uint q0, q1, q2;
-	uint m0, m1, m2;
+	int q0, q1, q2;
+	int m0, m1, m2;
 
 	split_high_low(b0, bitcount, q0, m0);
 	split_high_low(b1, bitcount, q1, m1);
 	split_high_low(b2, bitcount, q2, m2);
 
-	uint packhigh = integer_from_quints[q2][q1][q0];
+	int packhigh = integer_from_quints[q2][q1][q0];
 
 	outputs = orbits8_ptr(outputs, outpos, m0, bitcount);
 	outpos += bitcount;
@@ -240,33 +234,19 @@ void encode_quints(uint bitcount,
  * Encode a sequence of numbers using using one trit and a custom number of
  * bits per number.
  */
-void encode_by_trits(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount, out uint4 outputs, out uint bitoffset)
+void encode_by_trits(int numbers[ISE_BYTE_COUNT], int numcount, int bitcount, out int4 outputs, out int bitoffset)
 {
-	uint4 outbytes = 0;
-	uint bitpos = 0;
+	int4 outbytes = 0;
+	int bitpos = 0;
+	int num = (numcount + 4) - (numcount + 4) % 5;
 
-	uint num = (numcount + 4) - (numcount + 4) % 5;
-
-	//uint num = ((numcount % 5) == 0) ? numcount : 5 * ceil(numcount / 5.0);
-
-	//uint elements[ISE_BYTE_COUNT + 4];
-	//for (uint i = 0; i < ISE_BYTE_COUNT + 4; ++i)
-	//{
-	//	elements[i] = 0;
-	//}
-
-	//for (uint i = 0; i < numcount; ++i)
-	//{
-	//	elements[i] = numbers[i];
-	//}
-
-	for (uint i = 0; i < num; i += 5)
+	for (int i = 0; i < num; i += 5)
 	{
-		uint b0 = numbers[i + 0];
-		uint b1 = numbers[i + 1];
-		uint b2 = numbers[i + 2];
-		uint b3 = numbers[i + 3];
-		uint b4 = numbers[i + 4];
+		int b0 = numbers[i + 0];
+		int b1 = numbers[i + 1];
+		int b2 = numbers[i + 2];
+		int b3 = numbers[i + 3];
+		int b4 = numbers[i + 4];
 		encode_trits(bitcount, b0, b1, b2, b3, b4, outbytes, bitpos);
 	}
 	outputs = outbytes;
@@ -277,34 +257,17 @@ void encode_by_trits(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount,
  * Encode a sequence of numbers using one quint and the custom number of bits
  * per number.
  */
-void encode_by_quints(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount, out uint4 outputs, out uint bitoffset)
+void encode_by_quints(int numbers[ISE_BYTE_COUNT], int numcount, int bitcount, out int4 outputs, out int bitoffset)
 {
-	uint4 outbytes = 0;
-	uint bitpos = 0;
+	int4 outbytes = 0;
+	int bitpos = 0;
+	int num = (numcount + 2) - (numcount + 2) % 3;
 
-	//uint num = (uint)((numcount + 2) / 3);
-
-	uint num = (numcount + 2) - (numcount + 2) % 3;
-
-	//uint num = ((numcount % 3) == 0) ? numcount : 3 * ceil(numcount / 3.0);
-
-
-	//uint elements[ISE_BYTE_COUNT + 2];
-	//for (uint i = 0; i < ISE_BYTE_COUNT + 2; ++i)
-	//{
-	//	elements[i] = 0;
-	//}
-
-	//for (uint i = 0; i < numcount; ++i)
-	//{
-	//	elements[i] = numbers[i];
-	//}
-
-	for (uint i = 0; i < num; i += 3)
+	for (int i = 0; i < num; i += 3)
 	{
-		uint b0 = numbers[i + 0];
-		uint b1 = numbers[i + 1];
-		uint b2 = numbers[i + 2];
+		int b0 = numbers[i + 0];
+		int b1 = numbers[i + 1];
+		int b2 = numbers[i + 2];
 		encode_quints(bitcount, b0, b1, b2, outbytes, bitpos);
 	}
 
@@ -316,11 +279,12 @@ void encode_by_quints(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount
  * Encode a sequence of numbers using binary representation with the selected
  * bit count.
  */
-inline void encode_by_binary(uint numbers[ISE_BYTE_COUNT], uint numcount, uint bitcount, out uint4 outputs, out uint bitoffset)
+inline void encode_by_binary(int numbers[ISE_BYTE_COUNT], int numcount, int bitcount, out int4 outputs, out int bitoffset)
 {
-	uint4 outbytes = uint4(0, 0, 0, 0);
-	uint bitpos = 0;
-	for (uint i = 0; i < numcount && i < ISE_BYTE_COUNT; ++i)
+	int4 outbytes = int4(0, 0, 0, 0);
+	int bitpos = 0;
+
+	for (int i = 0; i < numcount; ++i)
 	{
 		outbytes = orbits8_ptr(outbytes, bitpos, numbers[i], bitcount);
 		bitpos += bitcount;
@@ -329,23 +293,177 @@ inline void encode_by_binary(uint numbers[ISE_BYTE_COUNT], uint numcount, uint b
 	bitoffset = bitpos;
 }
 
-void integer_sequence_encode(uint numbers[ISE_BYTE_COUNT], uint count, uint range, out uint4 outputs, out uint bitpos)
+void bise_endpoints(int numbers[8], int hasalpha, int range, out int4 outputs, out int bitpos)
 {
-	uint bits = bits_trits_quints_table[range * 3 + 0];
-	uint trits = bits_trits_quints_table[range * 3 + 1];
-	uint quints = bits_trits_quints_table[range * 3 + 2];
+	int bits = bits_trits_quints_table[range * 3 + 0];
+	int trits = bits_trits_quints_table[range * 3 + 1];
+	int quints = bits_trits_quints_table[range * 3 + 2];
 
 	if (trits == 1)
 	{
-		encode_by_trits(numbers, count, bits, outputs, bitpos);
+		outputs = 0;
+		bitpos = 0;
+
+		int b0 = numbers[0];
+		int b1 = numbers[1];
+		int b2 = numbers[2];
+		int b3 = numbers[3];
+		int b4 = numbers[4];
+		encode_trits(bits, b0, b1, b2, b3, b4, outputs, bitpos);
+
+		b0 = numbers[5];
+		b1 = hasalpha ? numbers[6] : 0;
+		b2 = hasalpha ? numbers[7] : 0;
+		encode_trits(bits, b0, b1, b2, 0, 0, outputs, bitpos);
+
 	}
 	else if (quints == 1)
 	{
-		encode_by_quints(numbers, count, bits, outputs, bitpos);
+		outputs = 0;
+		bitpos = 0;
+
+		int b0 = numbers[0];
+		int b1 = numbers[1];
+		int b2 = numbers[2];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[3];
+		b1 = numbers[4];
+		b2 = numbers[5];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = hasalpha ? numbers[6] : 0;
+		b1 = hasalpha ? numbers[7] : 0;
+		encode_quints(bits, b0, b1, 0, outputs, bitpos);
+
 	}
 	else
 	{
-		encode_by_binary(numbers, count, bits, outputs, bitpos);
+		//outputs = 0;
+		//bitpos = 8 * bits;
+		//outputs.x = (numbers[0]) | (numbers[1] << 8) | (numbers[2] << 16) | (numbers[3] << 24);
+		//outputs.y = (numbers[4]) | (numbers[5] << 8) | (numbers[6] << 16) | (numbers[7] << 24);	
+
+
+
+		int outs[16],
+
+		bitpos = 0;
+		int i = 0;
+		for (i = 0; i < 16; ++i)
+		{
+			outs[i] = 0;
+		}
+		for (i = 0; i < 8; ++i)
+		{
+			int idx = bitpos / 8;
+			int offset = bitpos % 8;
+			int mask = (numbers[i] << offset);
+			outs[idx] |= mask & 0xFF;
+			outs[idx + 1] |= (mask >> 8) & 0xFF;
+			bitpos += bits;
+		}
+
+		outputs = array16_2_int4(outs);
+
 	}
 
 }
+
+//void bise_weights(int numbers[16], int range, out int outputs[16], out int bitpos)
+void bise_weights(int numbers[16], int range, out int4 outputs, out int bitpos)
+{
+	int bits = bits_trits_quints_table[range * 3 + 0];
+	int trits = bits_trits_quints_table[range * 3 + 1];
+	int quints = bits_trits_quints_table[range * 3 + 2];
+
+	if (trits == 1)
+	{
+		outputs = 0;
+		bitpos = 0;
+
+		int b0 = numbers[0];
+		int b1 = numbers[1];
+		int b2 = numbers[2];
+		int b3 = numbers[3];
+		int b4 = numbers[4];
+		encode_trits(bits, b0, b1, b2, b3, b4, outputs, bitpos);
+
+		b0 = numbers[5];
+		b1 = numbers[6];
+		b2 = numbers[7];
+		b3 = numbers[8];
+		b4 = numbers[9];
+		encode_trits(bits, b0, b1, b2, b3, b4, outputs, bitpos);
+
+		b0 = numbers[10];
+		b1 = numbers[11];
+		b2 = numbers[12];
+		b3 = numbers[13];
+		b4 = numbers[14];
+		encode_trits(bits, b0, b1, b2, b3, b4, outputs, bitpos);
+
+		b0 = numbers[15];
+		encode_trits(bits, b0, 0, 0, 0, 0, outputs, bitpos);
+	
+	}
+	else if (quints == 1)
+	{
+		outputs = 0;
+		bitpos = 0;
+
+		int b0 = numbers[0];
+		int b1 = numbers[1];
+		int b2 = numbers[2];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[3];
+		b1 = numbers[4];
+		b2 = numbers[5];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[6];
+		b1 = numbers[7];
+		b2 = numbers[8];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[9];
+		b1 = numbers[10];
+		b2 = numbers[11];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[12];
+		b1 = numbers[13];
+		b2 = numbers[14];
+		encode_quints(bits, b0, b1, b2, outputs, bitpos);
+
+		b0 = numbers[15];
+		encode_quints(bits, b0, 0, 0, outputs, bitpos);
+
+	}
+	else
+	{
+		int outs[16],
+
+		bitpos = 0;
+		int i = 0;
+		for (i = 0; i < 16; ++i)
+		{
+			outs[i] = 0;
+		}
+		for (i = 0; i < 16; ++i)
+		{
+			int idx = bitpos / 8;
+			int offset = bitpos % 8;
+			int mask = (numbers[i] << offset);
+			outs[idx] |= mask & 0xFF;
+			outs[idx + 1] |= (mask >> 8) & 0xFF;
+			bitpos += bits;
+		}
+
+		outputs = array16_2_int4(outs);
+
+	}
+
+}
+
