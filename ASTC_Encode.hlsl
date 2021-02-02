@@ -406,63 +406,68 @@ void choose_best_quantmethod(int4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, in
 
 }
 
-int4 assemble_block(int blockmode, int color_endpoint_mode, int partition_count, int partition_index, int4 ep_ise, int ep_bitcnt, int4 wt_ise, int wt_bitcnt)
+int4 assemble_block(int blockmode, int color_endpoint_mode, int partition_count, int partition_index, int ep_ise[16], int ep_bitcnt, int wt_ise[16], int wt_bitcnt)
 {
-
-	int weights[16];
-	int4_2_array16(wt_ise, weights);
+	int outs[16];
 
 	int i = 0;
-	int j = MAX_ENCODED_WEIGHT_BYTES - 1;
+	int wt_count = (wt_bitcnt + 7) / 8;
+	int j = wt_count - 1;
 	UNROLL
-	for (; i < j; ++i, --j)
+	for (i = 0; i < wt_count; ++i, --j)
 	{
-		swap(weights[i], weights[j]);
+		outs[i] = wt_ise[j];
 	}
-	
+
 	UNROLL
-	for (i = 0; i < MAX_ENCODED_WEIGHT_BYTES; ++i)
+	for (i = 0; i < wt_count; ++i)
 	{
-		weights[i] = reverse_byte(weights[i]);
+		outs[i] = reverse_byte(outs[i]);
 	}
 
 	UNROLL
 	for (i = BLOCK_BYTES - 1; i >= BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES; --i)
 	{
-		weights[i] = weights[i - (BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES)];
+		outs[i] = outs[i - (BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES)];
 	}
 
 	UNROLL
 	for (i = 0; i < BLOCK_BYTES - MAX_ENCODED_WEIGHT_BYTES; ++i)
 	{
-		weights[i] = 0;
+		outs[i] = 0;
 	}
 
-	int4 phy_blk = array16_2_int4(weights);
-	phy_blk = orbits8_ptr(phy_blk, 0, blockmode & 0xFF, 8);
-	phy_blk = orbits8_ptr(phy_blk, 8, (blockmode >> 8) & 0xFF, 3);
+	int bitpos = 0;
+	orbits8_ptr(blockmode & 0xFF,		 8, outs, bitpos);
+	orbits8_ptr((blockmode >> 8) & 0xFF, 3, outs, bitpos);
+	orbits8_ptr(partition_count - 1,	 2, outs, bitpos);
 
-	int multi = partition_count > 1 ? 1 : 0;
+	// CEM
+	int cem_offset = 13;
+	int endpoint_offset = 17;
+	int cem_bits = 4;
 
-	int part_value = partition_count - 1;
-	int part_index = multi * partition_index;
-	phy_blk = orbits8_ptr(phy_blk, 11, part_value, 2);
+	//if (partition_count > 1)
+	//{
+	//	phy_blk = orbits8_ptr(phy_blk, 13, partition_index & 63, 6);
+	//	phy_blk = orbits8_ptr(phy_blk, 19, partition_index >> 6, 4);
+	//	cem_offset = 23;
+	//	endpoint_offset = 29;
+	//	cem_bits = 6;
+	//}
 
-//	if (partition_count > 1)
-//	{
-//		phy_blk = orbits8_ptr(phy_blk, 13, part_index & 63, 6);
-//		phy_blk = orbits8_ptr(phy_blk, 19, part_index >> 6, 4);
-//	}
+	int wp_count = (ep_bitcnt + 7) / 8;
+	for (i = 0; i < 8; ++i)
+	{
+		int idx = bitpos / 8;
+		int offset = bitpos % 8;
+		int mask = (ep_ise[i] << offset);
+		outs[idx] |= mask & 0xFF;
+		outs[idx + 1] |= (mask >> 8) & 0xFF;
+		bitpos += 8;
+	}
 
-	// CEM	
-	int cem_offset = multi * 10 + 13;
-	int endpoint_offset = multi * 12 + 17;
-	int cem_bits = multi * 2 + 4;
-
-	phy_blk = orbits8_ptr(phy_blk, cem_offset, color_endpoint_mode, cem_bits);
-
-	// endpoints start from ( multi_part ? bits 29 : bits 17 )
-	copy_bytes(ep_ise, MAX_ENCODED_COLOR_ENDPOINT_BYTES, phy_blk, endpoint_offset);
+	int4 phy_blk = array16_2_int4(outs);
 
 	return phy_blk;
 
@@ -473,8 +478,6 @@ int4 encode_block(int4 texels[BLOCK_SIZE], int hasalpha)
 	float4 ep0, ep1;
 	//principal_component_analysis(texels, hasalpha, ep0, ep1);
 	max_accumulation_pixel_direction(texels, hasalpha, ep0, ep1);
-
-
 
 	// for single partition
 	int partition_index = 0;
@@ -530,8 +533,6 @@ int4 encode_block(int4 texels[BLOCK_SIZE], int hasalpha)
 	blockmode |= h << 9;
 	blockmode |= d << 10;
 
-	int i = 0;
-
 	// encode endpoints
 	int endpoints_quantized[8];
 	encode_color(colorquant_index, ep0, ep1, endpoints_quantized);
@@ -540,6 +541,8 @@ int4 encode_block(int4 texels[BLOCK_SIZE], int hasalpha)
 	int weights_quantized[16];
 	calculate_quantized_weights(texels, weight_range, ep0, ep1, weights_quantized);
 
+	int i = 0;
+
 	UNROLL
 	for (i = 0; i < 16; ++i)
 	{
@@ -547,19 +550,15 @@ int4 encode_block(int4 texels[BLOCK_SIZE], int hasalpha)
 	}
 
 	// endpoints_quantized ise encode
-	int4 ep_ise;
+	int ep_ise[16];
 	int ep_bitcnt = 0;
 	bise_endpoints(endpoints_quantized, hasalpha, endpoint_quantmethod, ep_ise, ep_bitcnt);
 
 	// weights_quantized ise encode
-	int4 wt_ise;
+	int wt_ise[16];
 	int wt_bitcnt = 0;
 	bise_weights(weights_quantized, weight_quantmethod, wt_ise, wt_bitcnt);
 
-//	return array16_2_int4(weights_quantized);
-
-	//return wt_ise;
-	 
 	// assemble to astcblock
 	return assemble_block(blockmode, color_endpoint_mode, partition_count, partition_index, ep_ise, ep_bitcnt, wt_ise, wt_bitcnt);
 
