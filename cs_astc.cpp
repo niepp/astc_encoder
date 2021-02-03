@@ -240,9 +240,7 @@ int main()
 	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
 
 
-
 	{
-
 		int row = 0;
 		int col = 0;
 		uint8_t* pd = pMemBuf + (row * 256 + col) * 16;
