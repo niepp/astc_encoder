@@ -1,7 +1,7 @@
 
 // from [ARM:astc-encoder] quantization_and_transfer_table quant_and_xfer_tables
 #define WEIGHT_QUANTIZE_NUM 32
-static const int scramble_table[12 * WEIGHT_QUANTIZE_NUM] = {
+static const uint scramble_table[12 * WEIGHT_QUANTIZE_NUM] = {
 	// quantization method 0, range 0..1
 	//{
 		0, 1,
@@ -77,7 +77,7 @@ static const int scramble_table[12 * WEIGHT_QUANTIZE_NUM] = {
 	QUANT_256
 */
 #define COLOR_QUANTIZE_NUM 256
-static const int color_quantize_table[8 * COLOR_QUANTIZE_NUM] = {
+static const uint color_quantize_table[8 * COLOR_QUANTIZE_NUM] = {
 	// QUANT_12
 	//{
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4,
@@ -239,7 +239,7 @@ static const int color_quantize_table[8 * COLOR_QUANTIZE_NUM] = {
 	//}
 };
 
-static const int color_unquantize_table[8 * COLOR_QUANTIZE_NUM] = {
+static const uint color_unquantize_table[8 * COLOR_QUANTIZE_NUM] = {
 
 	// QUANT_12
 	//{

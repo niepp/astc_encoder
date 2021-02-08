@@ -47,32 +47,12 @@
 #define	QUANT_256 20
 #define	QUANT_MAX 21
 
-int sum(int3 color)
+uint sum(uint3 color)
 {
 	return color.r + color.g + color.b;
 }
 
-float3 to_float3(int3 color)
-{
-	return float3(color.r, color.g, color.b);
-}
-
-int3 to_int3(float3 color)
-{
-	return int3(color.r, color.g, color.b);
-}
-
-float4 to_float4(int4 color)
-{
-	return float4(color.r, color.g, color.b, color.a);
-}
-
-int4 to_int4(float4 color)
-{
-	return int4(color.r, color.g, color.b, color.a);
-}
-
-int4 array16_2_int4(int inputs[16])
+uint4 array16_2_uint4(uint inputs[16])
 {
 	uint4 outputs = 0;
 	outputs.x = (inputs[0]) | (inputs[1] << 8) | (inputs[2] << 16) | (inputs[3] << 24);
@@ -82,33 +62,9 @@ int4 array16_2_int4(int inputs[16])
 	return outputs;
 }
 
-void int4_2_array16(int4 src, out int dst[16])
+void swap(inout uint4 lhs, inout uint4 rhs)
 {
-	dst[0] = src.x & 0xFF;
-	dst[1] = (src.x >> 8) & 0xFF;
-	dst[2] = (src.x >> 16) & 0xFF;
-	dst[3] = (src.x >> 24) & 0xFF;
-
-	dst[4] = src.y & 0xFF;
-	dst[5] = (src.y >> 8) & 0xFF;
-	dst[6] = (src.y >> 16) & 0xFF;
-	dst[7] = (src.y >> 24) & 0xFF;
-
-	dst[8] = src.z & 0xFF;
-	dst[9] = (src.z >> 8) & 0xFF;
-	dst[10] = (src.z >> 16) & 0xFF;
-	dst[11] = (src.z >> 24) & 0xFF;
-
-	dst[12] = src.w & 0xFF;
-	dst[13] = (src.w >> 8) & 0xFF;
-	dst[14] = (src.w >> 16) & 0xFF;
-	dst[15] = (src.w >> 24) & 0xFF;
-
-}
-
-void swap(inout int4 lhs, inout int4 rhs)
-{
-	int4 tmp = lhs;
+	uint4 tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }
@@ -120,9 +76,9 @@ void swap(inout float4 lhs, inout float4 rhs)
 	rhs = tmp;
 }
 
-void swap(inout int lhs, inout int rhs)
+void swap(inout uint lhs, inout uint rhs)
 {
-	int tmp = lhs;
+	uint tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }
