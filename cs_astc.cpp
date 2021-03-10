@@ -77,7 +77,7 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 	TexDesc.Height = ysize;		// grid size of the waves, colums
 	TexDesc.MipLevels = 1;
 	TexDesc.ArraySize = 1;
-	TexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	TexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	// SRGB?
 	TexDesc.SampleDesc.Count = 1;
 	TexDesc.SampleDesc.Quality = 0;
 	TexDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -242,7 +242,7 @@ int main()
 
 	{
 		int row = 0;
-		int col = 0;
+		int col = 72;
 		uint8_t* pd = pMemBuf + (row * 256 + col) * 16;
 
 		int nothing = 0;
