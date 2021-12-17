@@ -17,8 +17,9 @@ typedef struct _csConstantBuffer
 
 HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR target, _In_ ID3D11Device* device, _Outptr_ ID3DBlob** blob)
 {
-	if (!srcFile || !entryPoint || !device || !blob)
+	if (!srcFile || !entryPoint || !device || !blob) {
 		return E_INVALIDARG;
+	}
 
 	*blob = nullptr;
 
@@ -27,8 +28,7 @@ HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR targ
 	flags |= D3DCOMPILE_DEBUG;
 #endif
 
-	const D3D_SHADER_MACRO defines[] =
-	{
+	const D3D_SHADER_MACRO defines[] = {
 		"EXAMPLE_DEFINE", "1",
 		NULL, NULL
 	};
@@ -40,17 +40,14 @@ HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR targ
 		flags, 0,
 		&shaderBlob, &errorBlob);
 
-	if (FAILED(hr))
-	{
-		if (errorBlob)
-		{
+	if (FAILED(hr)) {
+		if (errorBlob) {
 			printf((char*)errorBlob->GetBufferPointer());
 			errorBlob->Release();
 		}
-
-		if (shaderBlob)
+		if (shaderBlob) {
 			shaderBlob->Release();
-
+		}
 		return hr;
 	}
 
@@ -67,15 +64,13 @@ HRESULT create_shader(ID3D11Device* pd3dDevice, LPCWSTR srcFile, LPCSTR entryPoi
 	// Compile shader
 	ID3DBlob *csBlob = nullptr;
 	hr = compile_shader(srcFile, entryPoint, target, pd3dDevice, &csBlob);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr))	{
 		return -1;
 	}
 
 	// Create compute shader
 	hr = pd3dDevice->CreateComputeShader(csBlob->GetBufferPointer(), csBlob->GetBufferSize(), nullptr, &pComputeShader);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr))	{
 		return -1;
 	}
 
@@ -83,33 +78,25 @@ HRESULT create_shader(ID3D11Device* pd3dDevice, LPCWSTR srcFile, LPCSTR entryPoi
 
 }
 
-
 #define THREAD_NUM_X 8
 #define THREAD_NUM_Y 8
+
 #define BLOCK_SIZE_X 4
 #define BLOCK_SIZE_Y 4
 #define BLOCK_SIZE 16
 
-ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pCubeTexture)
+ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pSrcTexture)
 {
-	const int cFrameRate = 30;
-	const int cWidth = 1280;
-	const int cHeight = 800;
-
-	float aspectRatio = 1.0f * cWidth / cHeight;
-
 	// create shader
 	ID3D11ComputeShader* computeShader = nullptr;
 	HRESULT hr = create_shader(pd3dDevice, L"ASTC_Encode.hlsl", "MainCS", "cs_5_0", computeShader);
-	if (FAILED(hr))
-	{
-		system("pause");
+	if (FAILED(hr))	{
 		return nullptr;
 	}
 	pDeviceContext->CSSetShader(computeShader, nullptr, 0);
 
 	D3D11_TEXTURE2D_DESC TexDesc;
-	pCubeTexture->GetDesc(&TexDesc);
+	pSrcTexture->GetDesc(&TexDesc);
 
 	// shader resource view
 	D3D11_SHADER_RESOURCE_VIEW_DESC pTexViewDesc;
@@ -117,14 +104,13 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	pTexViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 	pTexViewDesc.Texture2D.MipLevels = 1;
 	pTexViewDesc.Texture2D.MostDetailedMip = 0;
-	ID3D11ShaderResourceView* pCubeTextureRV = nullptr;
-	hr = pd3dDevice->CreateShaderResourceView(pCubeTexture, &pTexViewDesc, &pCubeTextureRV);
-	if (FAILED(hr))
-	{
+	ID3D11ShaderResourceView* pTextureSRV = nullptr;
+	hr = pd3dDevice->CreateShaderResourceView(pSrcTexture, &pTexViewDesc, &pTextureSRV);
+	if (FAILED(hr))	{
 		return nullptr;
 	}
 
-	pDeviceContext->CSSetShaderResources(0, 1, &pCubeTextureRV);
+	pDeviceContext->CSSetShaderResources(0, 1, &pTextureSRV);
 
 	int xBlockNum = (TexDesc.Width + BLOCK_SIZE_X - 1) / BLOCK_SIZE_X;
 	int yBlockNum = (TexDesc.Height + BLOCK_SIZE_Y - 1) / BLOCK_SIZE_Y;
@@ -140,8 +126,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 
 	ID3D11Buffer* pOutBuf = nullptr;
 	hr = pd3dDevice->CreateBuffer(&sbOutDesc, nullptr, &pOutBuf);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr))	{
 		return nullptr;
 	}
 
@@ -153,8 +138,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 
 	ID3D11UnorderedAccessView* pOutUAV = nullptr;
 	hr = pd3dDevice->CreateUnorderedAccessView(pOutBuf, &UAVDesc, &pOutUAV);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr))	{
 		return nullptr;
 	}
 
@@ -172,8 +156,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	// constant buffer
 	ID3D11Buffer *pConstants;
 	hr = pd3dDevice->CreateBuffer(&ConstBufferDesc, nullptr, &pConstants);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		return nullptr;
 	}
 	pDeviceContext->CSSetConstantBuffers(0, 1, &pConstants);
@@ -188,11 +171,9 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 
 	pDeviceContext->UpdateSubresource(pConstants, 0, 0, &ConstBuff, 0, 0);
 
-	// 一个thread处理一个block
+	// compress one block per thread
 	pDeviceContext->Dispatch(xGroupNum, yGroupNum, 1);
 
 	return pOutBuf;
 
 }
-
-

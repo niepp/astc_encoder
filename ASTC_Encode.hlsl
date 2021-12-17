@@ -27,6 +27,12 @@ RWStructuredBuffer<uint4> OutBuffer;
 #include "ASTC_Table.hlsl"
 #include "ASTC_IntegerSequenceEncoding.hlsl"
 
+half LinearToSrgbBranchingChannel(half lin) 
+{
+	if(lin < 0.00313067) 
+		return lin * 12.92;
+	return pow(lin, (1.0/2.4)) * 1.055 - 0.055;
+}
 
 half4 get_texel(uint3 blockPos, uint idx)
 {
@@ -34,7 +40,7 @@ half4 get_texel(uint3 blockPos, uint idx)
 	uint x = idx - y * DIM;
 	uint3 pixelPos = blockPos + uint3(x, y, 0);
 
-pixelPos.y = InTexelHeight - 1 - pixelPos.y;
+	pixelPos.y = InTexelHeight - 1 - pixelPos.y;
 
 	half4 texel = InTexture.Load(pixelPos);
 
@@ -44,7 +50,10 @@ pixelPos.y = InTexelHeight - 1 - pixelPos.y;
 #endif
 
 #if USE_SRGB
-	texel.rgb = LinearToSrgb(texel.rgb);
+	//texel.rgb = LinearToSrgb(texel.rgb);
+	texel.r = LinearToSrgbBranchingChannel(texel.r);
+	texel.g = LinearToSrgbBranchingChannel(texel.g);
+	texel.b = LinearToSrgbBranchingChannel(texel.b);
 #endif
 	return texel * 255.0;
 }
@@ -364,10 +373,6 @@ uint quantize_weight(uint weight_range, half weight)
 {
 	uint q = round(weight * weight_range);
 	return clamp(q, 0, weight_range);
-
-//	half q = clamp(weight, 0.0f, 1.0f) * weight_range;	
-//	uint u = round(q);
-//	return clamp(q, 0, weight_range);
 }
 
 half unquantize_weight(uint weight_range, uint qw)
@@ -432,7 +437,6 @@ void calculate_quantized_weights(uint3 blockPos,
 {
 	int i = 0;
 	half4 vec_k = ep1 - ep0;
-	//if (dot(vec_k, vec_k) < SMALL_VALUE)
 	if (length(vec_k) < SMALL_VALUE)
 	{
 		for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
@@ -482,11 +486,6 @@ void calculate_quantized_weights(uint3 blockPos,
 		{
 			projw[i] = (projw[i] - minw) * invlen;
 			weights[i] = quantize_weight(weight_range, projw[i]);
-
-			//weights[i] = round(0.45f);
-			//weights[i] = round(projw[i] * weight_range + 0.5);
-			//weights[i] = round(projw[i] * weight_range);
-
 		}
 	}
 }
@@ -794,8 +793,6 @@ uint4 weight_ise(uint3 blockPos, uint weight_range, half4 ep0, half4 ep1, uint  
 	uint wt_quantized[X_GRIDS * Y_GRIDS];
 	calculate_quantized_weights(blockPos, weight_range, ep0, ep1, wt_quantized);
 
-//return array16_2_uint4(wt_quantized);
-
 	for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
 	{
 		int w = weight_quantmethod * WEIGHT_QUANTIZE_NUM + wt_quantized[i];
@@ -813,6 +810,8 @@ uint4 encode_block(uint3 blockPos)
 	half4 ep0, ep1;
 	//principal_component_analysis(blockPos, ep0, ep1);
 	max_accumulation_pixel_direction(blockPos, ep0, ep1);
+
+//	return round((ep0 + ep1) * 0.5f);
 
 	// endpoints_quant是根据整个128bits减去weights的编码占用和其他配置占用后剩余的bits位数来确定的。
 	// for fast compression!

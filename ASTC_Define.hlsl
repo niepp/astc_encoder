@@ -21,7 +21,7 @@
 #define FAST 1
 #define BLOCK_6X6 0
 #define HAS_ALPHA 1
-#define USE_SRGB 0
+#define USE_SRGB 1
 #define IS_NORMALMAP 0
 
 #if BLOCK_6X6
