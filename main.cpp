@@ -3,8 +3,10 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x600
-#include <stdio.h>
+
 #include <string>
+#include <iostream>
+#include <sstream>
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -64,8 +66,7 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 	int ysize = 0;
 	int components = 0;
 	stbi_uc* image = stbi_load(tex_path, &xsize, &ysize, &components, STBI_rgb_alpha);
-	if (image == nullptr)
-	{
+	if (image == nullptr) {
 		// if we haven't returned, it's because we failed to load the file.
 		printf("Failed to load image %s\nReason: %s\n", tex_path, stbi_failure_reason());
 		return nullptr;
@@ -97,46 +98,18 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 
 }
 
-
-HWND create_window(const char* window_title, int width, int height)
-{
-	const char class_name[] = "wndclass";
-	HINSTANCE instance = GetModuleHandle(nullptr);
-
-	// Register the window class
-	WNDCLASSEX wc = {
-		sizeof(WNDCLASSEX), CS_CLASSDC, DefWindowProc, 0, 0,
-		instance, nullptr, nullptr, nullptr, nullptr,
-		class_name, nullptr
-	};
-
-	RegisterClassEx(&wc);
-
-	// Create the application's window
-	DWORD style = WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_SYSMENU;
-	HWND hwnd = CreateWindow(class_name, window_title,
-		style,
-		0, 0,
-		width, height,
-		nullptr, nullptr,
-		instance, nullptr);
-
-	return hwnd;
-
-}
-
-HRESULT create_device_swapchain(HWND hwnd, int width, int height, IDXGISwapChain*& pSwapChain, ID3D11Device*& pd3dDevice, ID3D11DeviceContext*& pDeviceContext)
+HRESULT create_device_swapchain(HWND hwnd, IDXGISwapChain*& pSwapChain, ID3D11Device*& pd3dDevice, ID3D11DeviceContext*& pDeviceContext)
 {
 	DXGI_SWAP_CHAIN_DESC desc;
 	ZeroMemory(&desc, sizeof(DXGI_SWAP_CHAIN_DESC));
-	desc.BufferDesc.Width = width;
-	desc.BufferDesc.Height = height;
+	desc.BufferDesc.Width = 800;
+	desc.BufferDesc.Height = 600;
 	desc.BufferDesc.RefreshRate.Denominator = 0;
 	desc.BufferDesc.RefreshRate.Numerator = 0;
 	desc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	desc.SampleDesc.Count = 1;      //multisampling setting
 	desc.SampleDesc.Quality = 0;    //vendor-specific flag
-	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;		//DXGI_USAGE_UNORDERED_ACCESS;
+	desc.BufferUsage = DXGI_USAGE_UNORDERED_ACCESS;		//DXGI_USAGE_UNORDERED_ACCESS;
 	desc.BufferCount = 1;
 	desc.OutputWindow = hwnd;
 	desc.Windowed = TRUE;
@@ -207,52 +180,147 @@ void strip_file_extension(std::string &file_path)
 	}
 }
 
+
+bool parse_cmd(int argc, char** argv, encode_option& option)
+{
+	auto func_arg_value = [](int index, int argc, char** argv, bool &ret) -> bool {
+		if (index < argc && std::isdigit(*(argv[index])) > 0) {
+			ret = (argv[index] == std::string("0"));
+			return true;
+		}
+		return false;
+	};
+
+	for (int i = 2; i < argc; ++i) {
+		if (argv[i] == std::string("-4x4")) {
+			if (!func_arg_value(i + 1, argc, argv, option.is4x4)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-norm")) {
+			if (!func_arg_value(i + 1, argc, argv, option.is_normal_map)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-fast")) {
+			if (!func_arg_value(i + 1, argc, argv, option.fast)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-alpha")) {
+			if (!func_arg_value(i + 1, argc, argv, option.has_alpha)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-mips")) {
+			if (!func_arg_value(i + 1, argc, argv, option.has_mips)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 int main(int argc, char** argv)
 {
-	if (argc < 1) {
+	//argv[1] = "F:/work_astc/astc_cs/leaf.png";
+	//argv[2] = "-4x4";
+	//argv[3] = "1";
+	//argv[4] = "-fast";
+	//argv[5] = "1";
+	//argv[6] = "-norm";
+	//argv[7] = "0";
+
+	
+	if (argc < 2) {
 		return -1;
 	}
 
-	const int cFrameRate = 30;
-	const int cWidth = 1280;
-	const int cHeight = 800;
+	encode_option option;
+	if (!parse_cmd(argc, argv, option)) {
+		return -1;
+	}
 
-	const int cBlockDimX = 4;
-	const int cBlockDimY = 4;
-	const int cNumthreadX = 8; // same to compute shader [numthreads(8, 8, 1)]
-	const int cNumthreadY = 8;
+	option.is4x4 = false;
+	option.has_alpha = true;
+	option.has_mips = true;
 
-	HWND hwnd = create_window("cs", cWidth, cHeight);
+	int cBlockDimX = option.is4x4 ? 4 : 6;
+	int cBlockDimY = option.is4x4 ? 4 : 6;
+
+	HWND hwnd = ::GetDesktopWindow();
 
 	// setting up device
 	IDXGISwapChain* pSwapChain = nullptr;
 	ID3D11Device* pd3dDevice = nullptr;
 	ID3D11DeviceContext* pDeviceContext = nullptr;
-	HRESULT hr = create_device_swapchain(hwnd, cWidth, cHeight, pSwapChain, pd3dDevice, pDeviceContext);
+	HRESULT hr = create_device_swapchain(hwnd, pSwapChain, pd3dDevice, pDeviceContext);
 	if (FAILED(hr))	{
 		return hr;
 	}
 
-	std::string src_tex = argv[0];
-	
+	std::string src_tex = argv[1];
+
+	int DimSize = option.is4x4 ? 4 : 6;
+
 	// shader resource view
 	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str());
 
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pSrcTexture->GetDesc(&TexDesc);
+	int TexWidth = TexDesc.Width;
+	int TexHeight = TexDesc.Height;
 
-	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture);
+	int MipsNum = 1;
+	if (option.has_mips) {
+		int Size = min(TexWidth, TexHeight);
+		MipsNum = (int)ceil(log(Size) + 1);
+	}
+
+	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture, option, MipsNum);
 
 	// save to file
-	uint32_t bufLen = 16 * ((TexDesc.Height + cBlockDimY - 1) / cBlockDimY) * ((TexDesc.Width + cBlockDimX - 1) / cBlockDimX);
+	D3D11_BUFFER_DESC sbDesc;
+	pOutBuf->GetDesc(&sbDesc);
+
+	uint32_t bufLen = sbDesc.ByteWidth;
 	uint8_t* pMemBuf = new uint8_t[bufLen];
 	ZeroMemory(pMemBuf, bufLen);
 	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
 
-	std::string dst_tex = src_tex;
+	std::string dst_tex(src_tex);
 	strip_file_extension(dst_tex);
-	dst_tex += ".astc";
-	save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
+
+	if (option.has_mips) {
+		int CurBytes = 0;
+		for (int MipLevel = 0; MipLevel < MipsNum; ++MipLevel)
+		{
+			int CurWidth = max(TexWidth >> MipLevel, 1);
+			int CurHeight = max(TexHeight >> MipLevel, 1);
+
+			int NumBlocksX = (CurWidth + DimSize - 1) / DimSize;
+			int NumBlocksY = (CurHeight + DimSize - 1) / DimSize;
+			int MipBufSize = NumBlocksX * NumBlocksY * BLOCK_BYTES;
+
+			//std::cout << MipLevel << "\t" << MipBufSize << "\t" << CurBytes << std::endl;
+			std::stringstream ss;
+			ss << "_mip";
+			ss << MipLevel;
+			ss << ".astc";
+			std::string dst_tex_mip = dst_tex + ss.str();
+			save_astc(dst_tex_mip.c_str(), cBlockDimX, cBlockDimX, CurWidth, CurHeight, pMemBuf + CurBytes, MipBufSize);
+			CurBytes += MipBufSize;
+		}
+	}
+	else {
+		dst_tex += ".astc";
+		save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
+	}
+
+	delete pMemBuf;
+	pMemBuf = nullptr;
+
+	system("pause");
 
 	return 0;
 

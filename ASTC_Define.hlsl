@@ -10,19 +10,9 @@
 #define HAS_ALPHA 0
 #endif
 
-#ifndef USE_SRGB
-#define USE_SRGB 0
-#endif
-
 #ifndef IS_NORMALMAP
 #define IS_NORMALMAP 0
 #endif
-
-#define FAST 1
-#define BLOCK_6X6 0
-#define HAS_ALPHA 1
-#define USE_SRGB 1
-#define IS_NORMALMAP 0
 
 #if BLOCK_6X6
 #define DIM 6
@@ -80,44 +70,9 @@ uint sum(uint3 color)
 	return color.r + color.g + color.b;
 }
 
-
-uint4 array16_2_uint4(uint inputs[16])
+void swap(inout float4 lhs, inout float4 rhs)
 {
-	uint4 outputs = 0;
-	outputs.x = (inputs[0]) | (inputs[1] << 8) | (inputs[2] << 16) | (inputs[3] << 24);
-	outputs.y = (inputs[4]) | (inputs[5] << 8) | (inputs[6] << 16) | (inputs[7] << 24);
-	outputs.z = (inputs[8]) | (inputs[9] << 8) | (inputs[10] << 16) | (inputs[11] << 24);
-	outputs.w = (inputs[12]) | (inputs[13] << 8) | (inputs[14] << 16) | (inputs[15] << 24);
-	return outputs;
-}
-
-void uint4_2_array16(uint4 src, out uint dst[16])
-{
-	dst[0] = src.x & 0xFF;
-	dst[1] = (src.x >> 8) & 0xFF;
-	dst[2] = (src.x >> 16) & 0xFF;
-	dst[3] = (src.x >> 24) & 0xFF;
-
-	dst[4] = src.y & 0xFF;
-	dst[5] = (src.y >> 8) & 0xFF;
-	dst[6] = (src.y >> 16) & 0xFF;
-	dst[7] = (src.y >> 24) & 0xFF;
-
-	dst[8] = src.z & 0xFF;
-	dst[9] = (src.z >> 8) & 0xFF;
-	dst[10] = (src.z >> 16) & 0xFF;
-	dst[11] = (src.z >> 24) & 0xFF;
-
-	dst[12] = src.w & 0xFF;
-	dst[13] = (src.w >> 8) & 0xFF;
-	dst[14] = (src.w >> 16) & 0xFF;
-	dst[15] = (src.w >> 24) & 0xFF;
-
-}
-
-void swap(inout half4 lhs, inout half4 rhs)
-{
-	half4 tmp = lhs;
+	float4 tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }
@@ -125,20 +80,6 @@ void swap(inout half4 lhs, inout half4 rhs)
 void swap(inout uint4 lhs, inout uint4 rhs)
 {
 	uint4 tmp = lhs;
-	lhs = rhs;
-	rhs = tmp;
-}
-
-void swap(inout uint3 lhs, inout uint3 rhs)
-{
-	uint3 tmp = lhs;
-	lhs = rhs;
-	rhs = tmp;
-}
-
-void swap(inout uint lhs, inout uint rhs)
-{
-	uint tmp = lhs;
 	lhs = rhs;
 	rhs = tmp;
 }

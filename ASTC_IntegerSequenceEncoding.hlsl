@@ -2,7 +2,7 @@
   * Table that describes the number of trits or quints along with bits required
   * for storing each range.
   */
-static const uint bits_trits_quints_table[QUANT_MAX * 3] =
+static const int bits_trits_quints_table[QUANT_MAX * 3] =
 {
 	1, 0, 0,  // RANGE_2
 	0, 1, 0,  // RANGE_3
@@ -27,7 +27,7 @@ static const uint bits_trits_quints_table[QUANT_MAX * 3] =
 	8, 0, 0   // RANGE_256
 };
 
-static const uint integer_from_trits[243] =
+static const int integer_from_trits[243] =
 {
 	0,1,2,    4,5,6,    8,9,10, 
 	16,17,18, 20,21,22, 24,25,26,
@@ -61,7 +61,7 @@ static const uint integer_from_trits[243] =
 
 };
 
-static const uint integer_from_quints[125] =
+static const int integer_from_quints[125] =
 {
 	0,1,2,3,4, 			8,9,10,11,12, 			16,17,18,19,20,			24,25,26,27,28, 		5,13,21,29,6,
 	32,33,34,35,36, 	40,41,42,43,44, 		48,49,50,51,52, 		56,57,58,59,60, 		37,45,53,61,14,	
@@ -118,10 +118,9 @@ void orbits8_ptr(inout uint4 outputs, inout uint bitoffset, uint number, uint bi
 
 }
 
-
 void split_high_low(uint n, uint i, out int high, out uint low)
 {
-	uint low_mask = ((1 << i) - 1);
+	uint low_mask = (uint)((1 << i) - 1);
 	low = n & low_mask;
 	high = (n >> i) & 0xFF;
 }
