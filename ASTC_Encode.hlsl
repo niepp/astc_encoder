@@ -10,6 +10,10 @@
 #define THREAD_NUM_Y 8
 #endif
 
+#include "ASTC_Define.hlsl"
+#include "ASTC_Table.hlsl"
+#include "ASTC_IntegerSequenceEncoding.hlsl"
+
 cbuffer constData : register(b0)
 {
 	int InTexelHeight;
@@ -19,24 +23,6 @@ cbuffer constData : register(b0)
 
 Texture2D InTexture;
 RWStructuredBuffer<uint4> OutBuffer;
-
-#include "ASTC_Define.hlsl"
-#include "ASTC_Table.hlsl"
-#include "ASTC_IntegerSequenceEncoding.hlsl"
-
-float4 get_texel(uint3 blockPos, uint idx)
-{
-	uint y = idx / DIM;
-	uint x = idx - y * DIM;
-	uint3 pixelPos = blockPos;
-	pixelPos.xy += uint2(x, y);
-	float4 texel = InTexture.Load(pixelPos);
-#if IS_NORMALMAP
-	texel.b = 1.0f;
-	texel.a = 1.0f;
-#endif
-	return texel * 255.0f;
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calc the dominant axis
@@ -56,14 +42,13 @@ float4 eigen_vector(float4x4 m)
 	return v;
 }
 
-void find_min_max(uint3 blockPos, float4 pt_mean, float4 vec_k, out float4 e0, out float4 e1)
+void find_min_max(float4 texels[BLOCK_SIZE], float4 pt_mean, float4 vec_k, out float4 e0, out float4 e1)
 {
 	float a = 1e31f;
 	float b = -1e31f;
 	for (int i = 0; i < BLOCK_SIZE; ++i)
 	{
-		float4 texel = get_texel(blockPos, i);
-		texel -= pt_mean;
+		float4 texel = texels[i] - pt_mean;
 		float t = dot(texel, vec_k);
 		a = min(a, t);
 		b = max(b, t);
@@ -88,14 +73,13 @@ void find_min_max(uint3 blockPos, float4 pt_mean, float4 vec_k, out float4 e0, o
 
 }
 
-void principal_component_analysis(uint3 blockPos, out float4 e0, out float4 e1)
+void principal_component_analysis(float4 texels[BLOCK_SIZE], out float4 e0, out float4 e1)
 {
 	int i = 0;
 	float4 pt_mean = 0;
 	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
-		float4 texel = get_texel(blockPos, i);
-		pt_mean += texel;
+		pt_mean += texels[i];
 	}
 	pt_mean /= BLOCK_SIZE;
 
@@ -103,8 +87,7 @@ void principal_component_analysis(uint3 blockPos, out float4 e0, out float4 e1)
 	float s = 0;
 	for (int k = 0; k < BLOCK_SIZE; ++k)
 	{
-		float4 texel = get_texel(blockPos, k);
-		texel -= pt_mean;
+		float4 texel = texels[k] - pt_mean;
 		for (i = 0; i < 4; ++i)
 		{
 			for (int j = 0; j < 4; ++j)
@@ -117,18 +100,17 @@ void principal_component_analysis(uint3 blockPos, out float4 e0, out float4 e1)
 
 	float4 vec_k = eigen_vector(cov);
 
-	find_min_max(blockPos, pt_mean, vec_k, e0, e1);
+	find_min_max(texels, pt_mean, vec_k, e0, e1);
 
 }
 
-void max_accumulation_pixel_direction(uint3 blockPos, out float4 e0, out float4 e1)
+void max_accumulation_pixel_direction(float4 texels[BLOCK_SIZE], out float4 e0, out float4 e1)
 {
 	int i = 0;
 	float4 pt_mean = 0;
 	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
-		float4 texel = get_texel(blockPos, i);
-		pt_mean += texel;
+		pt_mean += texels[i];
 	}
 	pt_mean /= BLOCK_SIZE;
 
@@ -138,8 +120,7 @@ void max_accumulation_pixel_direction(uint3 blockPos, out float4 e0, out float4 
 	float4 sum_a = float4(0,0,0,0);
 	for (i = 0; i < BLOCK_SIZE; ++i)
 	{
-		float4 texel = get_texel(blockPos, i);
-		float4 dt = texel - pt_mean;
+		float4 dt = texels[i] - pt_mean;
 		sum_r += (dt.x > 0) ? dt : 0;
 		sum_g += (dt.y > 0) ? dt : 0;
 		sum_b += (dt.z > 0) ? dt : 0;
@@ -178,7 +159,7 @@ void max_accumulation_pixel_direction(uint3 blockPos, out float4 e0, out float4 
 	float lenk = length(vec_k);
 	vec_k = (lenk < SMALL_VALUE) ? vec_k : normalize(vec_k);
 
-	find_min_max(blockPos, pt_mean, vec_k, e0, e1);
+	find_min_max(texels, pt_mean, vec_k, e0, e1);
 
 }
 
@@ -341,16 +322,16 @@ static const float4 wt_grids[16] = {
 };
 
 
-float4 sample_texel(uint3 blockPos, uint4 index, float4 coff)
+float4 sample_texel(float4 texels[BLOCK_SIZE], uint4 index, float4 coff)
 {
-	float4 sum = get_texel(blockPos, index.x) * coff.x;
-	sum += get_texel(blockPos, index.y) * coff.y;
-	sum += get_texel(blockPos, index.z) * coff.z;
-	sum += get_texel(blockPos, index.w) * coff.w;
+	float4 sum = texels[index.x] * coff.x;
+	sum += texels[index.y] * coff.y;
+	sum += texels[index.z] * coff.z;
+	sum += texels[index.w] * coff.w;
 	return sum;
 }
 
-void calculate_normal_weights(uint3 blockPos,
+void calculate_normal_weights(float4 texels[BLOCK_SIZE],
 	float4 ep0,
 	float4 ep1,
 	out float projw[X_GRIDS * Y_GRIDS])
@@ -380,7 +361,7 @@ void calculate_normal_weights(uint3 blockPos,
 */
 		for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
 		{
-			float4 sum = sample_texel(blockPos, idx_grids[i], wt_grids[i]);
+			float4 sum = sample_texel(texels, idx_grids[i], wt_grids[i]);
 			float w = dot(vec_k, sum - ep0);
 			minw = min(w, minw);
 			maxw = max(w, maxw);
@@ -390,7 +371,7 @@ void calculate_normal_weights(uint3 blockPos,
 		// ensure "X_GRIDS * Y_GRIDS == BLOCK_SIZE"
 		for (i = 0; i < BLOCK_SIZE; ++i)
 		{
-			float4 texel = get_texel(blockPos, i);
+			float4 texel = texels[i];
 			float w = dot(vec_k, texel - ep0);
 			minw = min(w, minw);
 			maxw = max(w, maxw);
@@ -418,27 +399,18 @@ void quantize_weights(float projw[X_GRIDS * Y_GRIDS],
 	}
 }
 
-void calculate_quantized_weights(uint3 blockPos,
+void calculate_quantized_weights(float4 texels[BLOCK_SIZE],
 	uint weight_range,
 	float4 ep0,
 	float4 ep1,
 	out uint weights[X_GRIDS * Y_GRIDS])
 {
 	float projw[X_GRIDS * Y_GRIDS];
-	calculate_normal_weights(blockPos, ep0, ep1, projw);
+	calculate_normal_weights(texels, ep0, ep1, projw);
 	quantize_weights(projw, weight_range, weights);
 }
 
 #if !FAST
-float4 sample_texel(float4 texels[BLOCK_SIZE], uint4 index, float4 coff)
-{
-	float4 sum = texels[index.x] * coff.x;
-	sum += texels[index.y] * coff.y;
-	sum += texels[index.z] * coff.z;
-	sum += texels[index.w] * coff.w;
-	return sum;
-}
-
 void calculate_texelsweights(float4 texels[BLOCK_SIZE],
 	float4 ep0,
 	float4 ep1,
@@ -591,20 +563,14 @@ static const uint4 block_modes[2][BLOCK_MODE_NUM] =
 	}
 };
 
-void choose_best_quantmethod(uint3 blockPos, float4 ep0, float4 ep1, out uint4 best_blockmode)
+void choose_best_quantmethod(float4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, out uint4 best_blockmode)
 {
 	float minerr = 1e31;
-	int k = 0;
-	float4 texels[BLOCK_SIZE];
-	for (k = 0; k < BLOCK_SIZE; ++k)
-	{
-		texels[k] = get_texel(blockPos, k);
-	}
 
 	float projw[X_GRIDS * Y_GRIDS];
 	calculate_texelsweights(texels, ep0, ep1, projw);
 
-	for (k = 0; k < BLOCK_MODE_NUM; ++k)
+	for (int k = 0; k < BLOCK_MODE_NUM; ++k)
 	{
 		// encode
 #if HAS_ALPHA
@@ -725,12 +691,12 @@ uint4 endpoint_ise(uint colorquant_index, float4 ep0, float4 ep1, uint endpoint_
 	return ep_ise;
 }
 
-uint4 weight_ise(uint3 blockPos, uint weight_range, float4 ep0, float4 ep1, uint  weight_quantmethod)
+uint4 weight_ise(float4 texels[BLOCK_SIZE], uint weight_range, float4 ep0, float4 ep1, uint  weight_quantmethod)
 {
 	int i = 0;
 	// encode weights
 	uint wt_quantized[X_GRIDS * Y_GRIDS];
-	calculate_quantized_weights(blockPos, weight_range, ep0, ep1, wt_quantized);
+	calculate_quantized_weights(texels, weight_range, ep0, ep1, wt_quantized);
 
 	for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
 	{
@@ -744,11 +710,11 @@ uint4 weight_ise(uint3 blockPos, uint weight_range, float4 ep0, float4 ep1, uint
 	return wt_ise;
 }
 
-uint4 encode_block(uint3 blockPos)
+uint4 encode_block(float4 texels[BLOCK_SIZE])
 {
 	float4 ep0, ep1;
-	principal_component_analysis(blockPos, ep0, ep1);
-	//max_accumulation_pixel_direction(blockPos, ep0, ep1);
+	principal_component_analysis(texels, ep0, ep1);
+	//max_accumulation_pixel_direction(texels, ep0, ep1);
 
 	// endpoints_quant是根据整个128bits减去weights的编码占用和其他配置占用后剩余的bits位数来确定的。
 	// for fast compression!
@@ -759,7 +725,7 @@ uint4 encode_block(uint3 blockPos)
 #endif
 
 #if !FAST
-	choose_best_quantmethod(blockPos, ep0, ep1, best_blockmode);
+	choose_best_quantmethod(texels, ep0, ep1, best_blockmode);
 #endif
 
 	//uint weight_quantmethod = best_blockmode.x;
@@ -774,7 +740,7 @@ uint4 encode_block(uint3 blockPos)
 
 	uint4 ep_ise = endpoint_ise(best_blockmode.w, ep0, ep1, best_blockmode.y);
 
-	uint4 wt_ise = weight_ise(blockPos, best_blockmode.z - 1, ep0, ep1, best_blockmode.x);
+	uint4 wt_ise = weight_ise(texels, best_blockmode.z - 1, ep0, ep1, best_blockmode.x);
 
 	// assemble to astcblock
 #if HAS_ALPHA
@@ -796,17 +762,25 @@ void MainCS(
 	uint Gidx : SV_GroupIndex)			// group里的thread坐标展开后的索引
 {
 	uint blockID = DTid.y * InGroupNumX * THREAD_NUM_X + DTid.x;
+	uint BlockNum = (InTexelWidth + DIM - 1) / DIM;
 
-	uint2 BlockNum;
-	BlockNum.x = (InTexelWidth + DIM - 1) / DIM;
-	BlockNum.y = (InTexelHeight + DIM - 1) / DIM;
-
-	uint3 blockPos;
-	blockPos.y = (uint)(blockID / BlockNum.x);
-	blockPos.x = blockID - blockPos.y * BlockNum.x;
-	blockPos.xy *= DIM;
-	blockPos.z = 0;
-	OutBuffer[blockID] = encode_block(blockPos);
-
+	float4 texels[BLOCK_SIZE];
+	for (int k = 0; k < BLOCK_SIZE; ++k)
+	{		
+		uint2 blockPos;
+		blockPos.y = (uint)(blockID / BlockNum);
+		blockPos.x = blockID - blockPos.y * BlockNum;
+		
+		uint y = k / DIM;
+		uint x = k - y * DIM;
+		uint2 pixelPos = blockPos * DIM + uint2(x, y);
+		float4 texel = InTexture.Load(uint3(pixelPos, 0));
+#if IS_NORMALMAP
+		texel.b = 1.0f;
+		texel.a = 1.0f;
+#endif
+		texels[k] = texel * 255.0f;
+	}
+	OutBuffer[blockID] = encode_block(texels);
 }
 

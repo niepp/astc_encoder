@@ -209,11 +209,6 @@ bool parse_cmd(int argc, char** argv, encode_option& option)
 				return false;
 			}
 		}
-		else if (argv[i] == std::string("-mips")) {
-			if (!func_arg_value(i + 1, argc, argv, option.has_mips)) {
-				return false;
-			}
-		}
 	}
 	return true;
 }
@@ -238,9 +233,9 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	option.is4x4 = true;
+	//option.is4x4 = false;
 	option.has_alpha = true;
-	option.has_mips = true;
+	//option.fast = false;
 
 	int cBlockDimX = option.is4x4 ? 4 : 6;
 	int cBlockDimY = option.is4x4 ? 4 : 6;

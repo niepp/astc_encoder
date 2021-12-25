@@ -18,12 +18,10 @@ struct encode_option
 	bool is_normal_map;
 	bool fast;
 	bool has_alpha;
-	bool has_mips;
 	encode_option() : is4x4(true)
 		, is_normal_map(false)
 		, fast(true)
 		, has_alpha(false)
-		, has_mips(false)
 	{
 	}
 };
@@ -33,9 +31,7 @@ typedef struct _csConstantBuffer
 {
 	int TexelHeight;
 	int TexelWidth;
-	int MipsNum;
 	int GroupNumX;
-	int BlockNums[MAX_MIPS_NUM];
 } CSConstantBuffer;
 
 
