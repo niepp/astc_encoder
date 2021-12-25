@@ -90,7 +90,7 @@ HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR targ
 	return hr;
 }
 
-ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pSrcTexture, const encode_option& option, int MipsNum)
+ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pSrcTexture, const encode_option& option)
 {
 	// create shader
 	// compile shader
@@ -129,19 +129,9 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	int DimSize = option.is4x4 ? 4 : 6;
 	int TexWidth = TexDesc.Width;
 	int TexHeight = TexDesc.Height;
-
-	// flaten every mip to a one-dimension vector, then combination them together!
-	int TotalBlockNum = 0;
-	int BlockNums[MAX_MIPS_NUM] = {0};
-	for (int MipLevel = 0; MipLevel < MipsNum; ++MipLevel)
-	{
-		int CurW = TexWidth >> MipLevel;
-		int CurH = TexHeight >> MipLevel;
-		int xBlockNum = (CurW + DimSize - 1) / DimSize;
-		int yBlockNum = (CurH + DimSize - 1) / DimSize;
-		TotalBlockNum += xBlockNum * yBlockNum;
-		BlockNums[MipLevel + 1] = TotalBlockNum;
-	}
+	int xBlockNum = (TexWidth + DimSize - 1) / DimSize;
+	int yBlockNum = (TexHeight + DimSize - 1) / DimSize;
+	int TotalBlockNum = xBlockNum * yBlockNum;
 
 	int GroupSize = THREAD_NUM_X * THREAD_NUM_Y;
 	int GroupNum = (TotalBlockNum + GroupSize - 1) / GroupSize;
@@ -197,11 +187,7 @@ ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, 
 	CSConstantBuffer ConstBuff;
 	ConstBuff.TexelHeight = TexHeight;
 	ConstBuff.TexelWidth = TexWidth;
-	ConstBuff.MipsNum = MipsNum;
 	ConstBuff.GroupNumX = GroupNumX;
-	for (int i = 0; i < MAX_MIPS_NUM; ++i) {
-		ConstBuff.BlockNums[i] = BlockNums[i];
-	}
 
 	pDeviceContext->UpdateSubresource(pConstants, 0, 0, &ConstBuff, 0, 0);
 

@@ -1,6 +1,3 @@
-#define WIDTH 1280
-#define HEIGHT 800
-
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x600
 
@@ -60,7 +57,7 @@ typedef struct _renderContext
 } RenderContext;
 
 
-ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
+ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path, bool bSRGB)
 {
 	int xsize = 0;
 	int ysize = 0;
@@ -78,7 +75,7 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 	TexDesc.Height = ysize;		// grid size of the waves, colums
 	TexDesc.MipLevels = 1;
 	TexDesc.ArraySize = 1;
-	TexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;	// SRGB?
+	TexDesc.Format = bSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
 	TexDesc.SampleDesc.Count = 1;
 	TexDesc.SampleDesc.Quality = 0;
 	TexDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -241,7 +238,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	option.is4x4 = false;
+	option.is4x4 = true;
 	option.has_alpha = true;
 	option.has_mips = true;
 
@@ -264,20 +261,14 @@ int main(int argc, char** argv)
 	int DimSize = option.is4x4 ? 4 : 6;
 
 	// shader resource view
-	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str());
+	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), !option.is_normal_map);
 
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pSrcTexture->GetDesc(&TexDesc);
 	int TexWidth = TexDesc.Width;
 	int TexHeight = TexDesc.Height;
 
-	int MipsNum = 1;
-	if (option.has_mips) {
-		int Size = min(TexWidth, TexHeight);
-		MipsNum = (int)ceil(log(Size) + 1);
-	}
-
-	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture, option, MipsNum);
+	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture, option);
 
 	// save to file
 	D3D11_BUFFER_DESC sbDesc;
@@ -290,34 +281,10 @@ int main(int argc, char** argv)
 
 	std::string dst_tex(src_tex);
 	strip_file_extension(dst_tex);
+	dst_tex += ".astc";
+	save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
 
-	if (option.has_mips) {
-		int CurBytes = 0;
-		for (int MipLevel = 0; MipLevel < MipsNum; ++MipLevel)
-		{
-			int CurWidth = max(TexWidth >> MipLevel, 1);
-			int CurHeight = max(TexHeight >> MipLevel, 1);
-
-			int NumBlocksX = (CurWidth + DimSize - 1) / DimSize;
-			int NumBlocksY = (CurHeight + DimSize - 1) / DimSize;
-			int MipBufSize = NumBlocksX * NumBlocksY * BLOCK_BYTES;
-
-			//std::cout << MipLevel << "\t" << MipBufSize << "\t" << CurBytes << std::endl;
-			std::stringstream ss;
-			ss << "_mip";
-			ss << MipLevel;
-			ss << ".astc";
-			std::string dst_tex_mip = dst_tex + ss.str();
-			save_astc(dst_tex_mip.c_str(), cBlockDimX, cBlockDimX, CurWidth, CurHeight, pMemBuf + CurBytes, MipBufSize);
-			CurBytes += MipBufSize;
-		}
-	}
-	else {
-		dst_tex += ".astc";
-		save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
-	}
-
-	delete pMemBuf;
+	delete[] pMemBuf;
 	pMemBuf = nullptr;
 
 	system("pause");

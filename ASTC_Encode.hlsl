@@ -14,11 +14,8 @@ cbuffer constData : register(b0)
 {
 	int InTexelHeight;
 	int InTexelWidth;
-	int InMipsNum;
 	int InGroupNumX;
-	int InBlockNums[14];
 };
-
 
 Texture2D InTexture;
 RWStructuredBuffer<uint4> OutBuffer;
@@ -798,32 +795,17 @@ void MainCS(
 	uint3 DTid : SV_DispatchThreadID,	// DispatchThreadID = (GroupID X numthreads) + GroupThreadID
 	uint Gidx : SV_GroupIndex)			// group里的thread坐标展开后的索引
 {
-	int mipLevel = 0;
 	uint blockID = DTid.y * InGroupNumX * THREAD_NUM_X + DTid.x;
-	int i = 1;
-	for (i = 1; i <= InMipsNum; ++i)
-	{
-		if (blockID < InBlockNums[i].x) // InBlockNums[0] is always 0
-		{
-			mipLevel = i - 1;
-			break;
-		}
-	}
-
-	uint2 CurTexSize;
-	CurTexSize.x = (InTexelWidth >> mipLevel);
-	CurTexSize.y = (InTexelHeight >> mipLevel);
 
 	uint2 BlockNum;
-	BlockNum.x = (CurTexSize.x + DIM - 1) / DIM;
-	BlockNum.y = (CurTexSize.y + DIM - 1) / DIM;
+	BlockNum.x = (InTexelWidth + DIM - 1) / DIM;
+	BlockNum.y = (InTexelHeight + DIM - 1) / DIM;
 
 	uint3 blockPos;
-	blockPos.z = blockID - InBlockNums[mipLevel].x;
-	blockPos.y = (uint)(blockPos.z / BlockNum.x);
-	blockPos.x = blockPos.z - blockPos.y * BlockNum.x;
+	blockPos.y = (uint)(blockID / BlockNum.x);
+	blockPos.x = blockID - blockPos.y * BlockNum.x;
 	blockPos.xy *= DIM;
-	blockPos.z = mipLevel;
+	blockPos.z = 0;
 	OutBuffer[blockID] = encode_block(blockPos);
 
 }
