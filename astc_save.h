@@ -13,7 +13,6 @@ struct astc_header
 	uint8_t zsize[3];			// block count is inferred
 };
 
-
 //--------------------------------------------------------------------------------------
 // Create a CPU accessible buffer and download the content of a GPU buffer into it
 //-------------------------------------------------------------------------------------- 
@@ -49,7 +48,6 @@ HRESULT read_gpu(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pDeviceContext, 
 	pDeviceContext->Unmap(pReadbackbuf, 0);
 	return S_OK;
 }
-
 
 void save_astc(const char* astc_path, int xdim, int ydim, int xsize, int ysize, uint8_t* buffer, int bufsz)
 {

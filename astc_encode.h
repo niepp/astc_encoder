@@ -10,17 +10,14 @@
 #define THREAD_NUM_X	8
 #define THREAD_NUM_Y	8
 #define BLOCK_BYTES		16
-#define MAX_MIPS_NUM	14
 
 struct encode_option
 {
 	bool is4x4;
 	bool is_normal_map;
-	bool fast;
 	bool has_alpha;
 	encode_option() : is4x4(true)
 		, is_normal_map(false)
-		, fast(true)
 		, has_alpha(false)
 	{
 	}
@@ -48,16 +45,13 @@ HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR targ
 	flags |= D3DCOMPILE_DEBUG;
 #endif
 
-	auto cMAX_MIPS_NUM = std::to_string(MAX_MIPS_NUM);
 	auto cTHREAD_NUM_X = std::to_string(THREAD_NUM_X);
 	auto cTHREAD_NUM_Y = std::to_string(THREAD_NUM_Y);
 
 	const D3D_SHADER_MACRO defines[] = {
-		"MAX_MIPS_NUM", cMAX_MIPS_NUM.c_str(),
 		"THREAD_NUM_X", cTHREAD_NUM_X.c_str(),
 		"THREAD_NUM_Y", cTHREAD_NUM_Y.c_str(),
 		"IS_NORMALMAP", option.is_normal_map ? "1" : "0",
-		"FAST", option.fast ? "1" :"0",
 		"BLOCK_6X6", option.is4x4 ? "0" : "1",
 		"HAS_ALPHA", option.has_alpha ? "1" : "0",
 		NULL, NULL
@@ -86,7 +80,7 @@ HRESULT compile_shader(_In_ LPCWSTR srcFile, _In_ LPCSTR entryPoint, LPCSTR targ
 	return hr;
 }
 
-ID3D11Buffer* encode_astc(IDXGISwapChain *pSwapChain, ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pSrcTexture, const encode_option& option)
+ID3D11Buffer* encode_astc(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDeviceContext, ID3D11Texture2D *pSrcTexture, const encode_option& option)
 {
 	// create shader
 	// compile shader

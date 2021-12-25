@@ -2,13 +2,9 @@
 #define _WIN32_WINNT 0x600
 
 #include <string>
-#include <iostream>
-#include <sstream>
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
-#include <directxmath.h>
-
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxguid.lib")
@@ -16,46 +12,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "stb_image.h"
-#include "encode_astc.h"
-#include "save_astc.h"
 
-typedef struct _constantBufferStruct
-{
-	DirectX::XMFLOAT4X4 m;
-	DirectX::XMFLOAT4X4 vp;
-} ConstantBufferStruct;
-
-
-typedef struct _vertexPositionColor
-{
-	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT2 uv;
-} VertexPositionColor;
-
-
-typedef struct  _renderDevice
-{
-	IDXGISwapChain* pSwapChain;
-	ID3D11Device* pd3dDevice;
-	ID3D11DeviceContext* pDeviceContext;
-	ID3D11RenderTargetView* pRenderTarget;
-	ID3D11DepthStencilView* pDepthStencilView;
-} RenderDevice;
-
-
-typedef struct _renderContext
-{
-	ID3D11VertexShader*      pVertexShader;
-	ID3D11PixelShader*       pPixelShader;
-	ID3D11Buffer*            pVertexConstantBuffer;
-	ID3D11Buffer*            pPixelConstantBuffer;
-	ID3D11InputLayout*       pInputLayout;
-	ID3D11Buffer*            pVertexBuffer;
-	ID3D11Buffer*            pIndexBuffer;
-	ID3D11RasterizerState*	 pRasterState;
-	int indexCount;
-} RenderContext;
-
+#include "astc_encode.h"
+#include "astc_save.h"
 
 ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path, bool bSRGB)
 {
@@ -177,12 +136,11 @@ void strip_file_extension(std::string &file_path)
 	}
 }
 
-
 bool parse_cmd(int argc, char** argv, encode_option& option)
 {
 	auto func_arg_value = [](int index, int argc, char** argv, bool &ret) -> bool {
 		if (index < argc && std::isdigit(*(argv[index])) > 0) {
-			ret = (argv[index] == std::string("0"));
+			ret = (argv[index] != std::string("0"));
 			return true;
 		}
 		return false;
@@ -199,11 +157,6 @@ bool parse_cmd(int argc, char** argv, encode_option& option)
 				return false;
 			}
 		}
-		else if (argv[i] == std::string("-fast")) {
-			if (!func_arg_value(i + 1, argc, argv, option.fast)) {
-				return false;
-			}
-		}
 		else if (argv[i] == std::string("-alpha")) {
 			if (!func_arg_value(i + 1, argc, argv, option.has_alpha)) {
 				return false;
@@ -215,15 +168,6 @@ bool parse_cmd(int argc, char** argv, encode_option& option)
 
 int main(int argc, char** argv)
 {
-	//argv[1] = "F:/work_astc/astc_cs/leaf.png";
-	//argv[2] = "-4x4";
-	//argv[3] = "1";
-	//argv[4] = "-fast";
-	//argv[5] = "1";
-	//argv[6] = "-norm";
-	//argv[7] = "0";
-
-	
 	if (argc < 2) {
 		return -1;
 	}
@@ -232,13 +176,6 @@ int main(int argc, char** argv)
 	if (!parse_cmd(argc, argv, option)) {
 		return -1;
 	}
-
-	//option.is4x4 = false;
-	option.has_alpha = true;
-	//option.fast = false;
-
-	int cBlockDimX = option.is4x4 ? 4 : 6;
-	int cBlockDimY = option.is4x4 ? 4 : 6;
 
 	HWND hwnd = ::GetDesktopWindow();
 
@@ -253,8 +190,6 @@ int main(int argc, char** argv)
 
 	std::string src_tex = argv[1];
 
-	int DimSize = option.is4x4 ? 4 : 6;
-
 	// shader resource view
 	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), !option.is_normal_map);
 
@@ -263,7 +198,7 @@ int main(int argc, char** argv)
 	int TexWidth = TexDesc.Width;
 	int TexHeight = TexDesc.Height;
 
-	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture, option);
+	ID3D11Buffer* pOutBuf = encode_astc(pd3dDevice, pDeviceContext, pSrcTexture, option);
 
 	// save to file
 	D3D11_BUFFER_DESC sbDesc;
@@ -277,7 +212,9 @@ int main(int argc, char** argv)
 	std::string dst_tex(src_tex);
 	strip_file_extension(dst_tex);
 	dst_tex += ".astc";
-	save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
+
+	int DimSize = option.is4x4 ? 4 : 6;
+	save_astc(dst_tex.c_str(), DimSize, DimSize, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
 
 	delete[] pMemBuf;
 	pMemBuf = nullptr;

@@ -1,7 +1,3 @@
-#ifndef MAX_MIPS_NUM
-#define MAX_MIPS_NUM 14
-#endif
-
 #ifndef THREAD_NUM_X
 #define THREAD_NUM_X 8
 #endif
@@ -10,7 +6,67 @@
 #define THREAD_NUM_Y 8
 #endif
 
-#include "ASTC_Define.hlsl"
+#ifndef BLOCK_6X6
+#define BLOCK_6X6 0
+#endif
+
+#ifndef HAS_ALPHA
+#define HAS_ALPHA 0
+#endif
+
+#ifndef IS_NORMALMAP
+#define IS_NORMALMAP 0
+#endif
+
+#if BLOCK_6X6
+#define DIM 6
+#else
+#define DIM 4
+#endif
+
+#define BLOCK_SIZE ((DIM) * (DIM))
+
+#define BLOCK_BYTES 16
+
+#define X_GRIDS 4
+#define Y_GRIDS 4
+
+#define SMALL_VALUE 0.00001
+
+/*
+* supported color_endpoint_mode
+*/
+#define CEM_LDR_RGB_DIRECT 8
+#define CEM_LDR_RGBA_DIRECT 12
+
+/**
+ * form [ARM:astc-encoder]
+ * Define normalized (starting at zero) numeric ranges that can be represented
+ * with 8 bits or less.
+ */
+#define	QUANT_2 0
+#define	QUANT_3 1
+#define	QUANT_4 2
+#define	QUANT_5 3
+#define	QUANT_6 4
+#define	QUANT_8 5
+#define	QUANT_10 6
+#define	QUANT_12 7
+#define	QUANT_16 8
+#define	QUANT_20 9
+#define	QUANT_24 10
+#define	QUANT_32 11
+#define	QUANT_40 12
+#define	QUANT_48 13
+#define	QUANT_64 14
+#define	QUANT_80 15
+#define	QUANT_96 16
+#define	QUANT_128 17
+#define	QUANT_160 18
+#define	QUANT_192 19
+#define	QUANT_256 20
+#define	QUANT_MAX 21
+
 #include "ASTC_Table.hlsl"
 #include "ASTC_IntegerSequenceEncoding.hlsl"
 
@@ -27,6 +83,13 @@ RWStructuredBuffer<uint4> OutBuffer;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calc the dominant axis
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void swap(inout float4 lhs, inout float4 rhs)
+{
+	float4 tmp = lhs;
+	lhs = rhs;
+	rhs = tmp;
+}
+
 float4 eigen_vector(float4x4 m)
 {
 	// calc the max eigen value by iteration
@@ -166,86 +229,7 @@ void max_accumulation_pixel_direction(float4 texels[BLOCK_SIZE], out float4 e0, 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // quantize & unquantize the endpoints
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#if !FAST
-uint quantize_byte(uint qm_index, uint v)
-{
-	uint u = qm_index * COLOR_QUANTIZE_NUM * 4 + v;
-	uint offset = (u & 3) << 3;
-	return (color_quantize_table[u / 4] >> offset) & 255;
-}
-
-uint unquantize_byte(uint qm_index, uint v)
-{
-	uint u = qm_index * COLOR_QUANTIZE_NUM * 4 + v;
-	uint offset = (u & 3) << 3;
-	return (color_unquantize_table[u / 4] >> offset) & 255;
-}
-
-uint4 quantize_color(uint qm_index, uint4 c)
-{
-	uint4 result;
-	result.r = quantize_byte(qm_index, c.r);
-	result.g = quantize_byte(qm_index, c.g);
-	result.b = quantize_byte(qm_index, c.b);
-	result.a = quantize_byte(qm_index, c.a);
-	return result;
-}
-
-uint4 unquantize_color(uint qm_index, uint4 c)
-{
-	uint4 result;
-	result.r = unquantize_byte(qm_index, c.r);
-	result.g = unquantize_byte(qm_index, c.g);
-	result.b = unquantize_byte(qm_index, c.b);
-	result.a = unquantize_byte(qm_index, c.a);
-	return result;
-}
-
-void encode_color(uint qm_index, float4 e0, float4 e1, out uint endpoint_quantized[8])
-{
-	uint4 e0q = quantize_color(qm_index, round(e0));
-	uint4 e1q = quantize_color(qm_index, round(e1));
-
-	uint4 e0u = unquantize_color(qm_index, e0q);
-	uint4 e1u = unquantize_color(qm_index, e1q);
-
-	// Sort the endpoints to ensure that the normal encoding is used.
-	if (sum(e0u.rgb) > sum(e1u.rgb))
-	{
-		swap(e0q, e1q);
-	}
-
-	endpoint_quantized[0] = e0q.r;
-	endpoint_quantized[1] = e1q.r;
-	endpoint_quantized[2] = e0q.g;
-	endpoint_quantized[3] = e1q.g;
-	endpoint_quantized[4] = e0q.b;
-	endpoint_quantized[5] = e1q.b;
-	endpoint_quantized[6] = e0q.a;
-	endpoint_quantized[7] = e1q.a;
-}
-
-void decode_color(uint qm_index, uint endpoint_quantized[8], out float4 e0, out float4 e1)
-{
-	uint ir0 = unquantize_byte(qm_index, endpoint_quantized[0]);
-	uint ir1 = unquantize_byte(qm_index, endpoint_quantized[1]);
-	uint ig0 = unquantize_byte(qm_index, endpoint_quantized[2]);
-	uint ig1 = unquantize_byte(qm_index, endpoint_quantized[3]);
-	uint ib0 = unquantize_byte(qm_index, endpoint_quantized[4]);
-	uint ib1 = unquantize_byte(qm_index, endpoint_quantized[5]);
-	uint a0 = unquantize_byte(qm_index, endpoint_quantized[6]);
-	uint a1 = unquantize_byte(qm_index, endpoint_quantized[7]);
-
-	e0 = float4(ir0, ig0, ib0, a0);
-	e1 = float4(ir1, ig1, ib1, a1);
-
-	if (ir0 + ig0 + ib0 > ir1 + ig1 + ib1)
-	{
-		swap(e0, e1);
-	}
-
-}
-#else // for QUANT_256 quantization
+// for QUANT_256 quantization
 void encode_color(uint qm_index, float4 e0, float4 e1, out uint endpoint_quantized[8])
 {
 	uint4 e0q = round(e0);
@@ -265,8 +249,6 @@ void decode_color(uint qm_index, uint endpoint_quantized[8], out float4 e0, out 
 	e0 = float4(endpoint_quantized[0], endpoint_quantized[2], endpoint_quantized[4], endpoint_quantized[6]);
 	e1 = float4(endpoint_quantized[1], endpoint_quantized[3], endpoint_quantized[5], endpoint_quantized[7]);
 }
-#endif
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // calculate quantized weights
@@ -410,195 +392,10 @@ void calculate_quantized_weights(float4 texels[BLOCK_SIZE],
 	quantize_weights(projw, weight_range, weights);
 }
 
-#if !FAST
-void calculate_texelsweights(float4 texels[BLOCK_SIZE],
-	float4 ep0,
-	float4 ep1,
-	out float projw[X_GRIDS * Y_GRIDS])
-{
-	int i = 0;
-	float4 vec_k = ep1 - ep0;
-	if (length(vec_k) < SMALL_VALUE)
-	{
-		for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
-		{
-			projw[i] = 0;
-		}
-	}
-	else
-	{
-		vec_k = normalize(vec_k);
-		float minw = 1e31f;
-		float maxw = -1e31f;
-#if BLOCK_6X6
-		for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
-		{
-			float4 sum = sample_texel(texels, idx_grids[i], wt_grids[i]);
-			float w = dot(vec_k, sum - ep0);
-			minw = min(w, minw);
-			maxw = max(w, maxw);
-			projw[i] = w;
-		}
-#else
-		for (i = 0; i < BLOCK_SIZE; ++i)
-		{
-			float w = dot(vec_k, texels[i] - ep0);
-			minw = min(w, minw);
-			maxw = max(w, maxw);
-			projw[i] = w;
-		}
-#endif
-
-		float invlen = maxw - minw;
-		invlen = max(SMALL_VALUE, invlen);
-		invlen = 1.0 / invlen;
-		for (i = 0; i < X_GRIDS * Y_GRIDS; ++i)
-		{
-			projw[i] = (projw[i] - minw) * invlen;
-		}
-	}
-}
-
-static const float2 wt_lerp[6] = {
-	float2(1.0f, 0.0f),
-	float2(0.5f, 0.5f),
-	float2(1.0f, 0.0f),
-	float2(1.0f, 0.0f),
-	float2(0.5f, 0.5f),
-	float2(1.0f, 0.0f),
-};
-
-static const uint2 indexmap_lerp[6] = {
-	uint2(0, 0),
-	uint2(0, 1),
-	uint2(1, 1),
-	uint2(2, 2),
-	uint2(2, 3),
-	uint2(3, 3),
-};
-
-float sumdiff_of_lerp_colors(float4 texels[BLOCK_SIZE], uint weights_quantized[X_GRIDS * Y_GRIDS], uint weight_range, float4 ep0, float4 ep1)
-{
-	float sumdiff = 0;
-#if BLOCK_6X6
-	for (int i = 0; i < BLOCK_SIZE; ++i)
-	{
-		uint idx = i;
-		int row = idx / DIM;
-		int col = idx % DIM;
-
-		float wr0 = wt_lerp[row].x;
-		float wr1 = wt_lerp[row].y;
-		float wc0 = wt_lerp[col].x;
-		float wc1 = wt_lerp[col].y;
-
-		int y0 = indexmap_lerp[row].x;
-		int y1 = indexmap_lerp[row].y;
-		int x0 = indexmap_lerp[col].x;
-		int x1 = indexmap_lerp[col].y;
-
-		uint wq00 = weights_quantized[y0 * X_GRIDS + x0];
-		uint wq01 = weights_quantized[y0 * X_GRIDS + x1];
-		uint wq10 = weights_quantized[y1 * X_GRIDS + x0];
-		uint wq11 = weights_quantized[y1 * X_GRIDS + x1];
-
-		float4 wuq;
-		wuq.x = unquantize_weight(weight_range, wq00);
-		wuq.y = unquantize_weight(weight_range, wq01);
-		wuq.z = unquantize_weight(weight_range, wq10);
-		wuq.w = unquantize_weight(weight_range, wq11);
-
-		float4 diff = float4(wr0 * wc0, wr0 * wc1, wr1 * wc0, wr1 * wc1);
-		float w = dot(diff, wuq);
-		diff = lerp(ep0, ep1, w);
-		diff -= texels[i];
-		sumdiff += dot(diff, diff);
-	}
-#else
-	for (int i = 0; i < BLOCK_SIZE; ++i)
-	{
-		float w = unquantize_weight(weight_range, weights_quantized[i]);
-		float4 diff = lerp(ep0, ep1, w);
-		diff -= texels[i];
-		sumdiff += dot(diff, diff);
-	}
-#endif
-	return sumdiff;
-}
-#endif // FAST
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // encode single partition
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // candidate blockmode uint4(weights quantmethod, endpoints quantmethod, weights range, endpoints quantmethod index of table)
-
-#if !FAST
-#define BLOCK_MODE_NUM 10
-static const uint4 block_modes[2][BLOCK_MODE_NUM] =
-{
-	{ // CEM_LDR_RGB_DIRECT
-		uint4(QUANT_3, QUANT_256, 3, 7),
-		uint4(QUANT_4, QUANT_256, 4, 7),
-		uint4(QUANT_5, QUANT_256, 5, 7),
-		uint4(QUANT_6, QUANT_256, 6, 7),
-		uint4(QUANT_8, QUANT_256, 8, 7),
-		uint4(QUANT_12, QUANT_256, 12, 7),
-		uint4(QUANT_16, QUANT_192, 16, 6),
-		uint4(QUANT_20, QUANT_96, 20, 5),
-		uint4(QUANT_24, QUANT_64, 24, 4),
-		uint4(QUANT_32, QUANT_32, 32, 2),
-	},
-
-	{ // CEM_LDR_RGBA_DIRECT
-		uint4(QUANT_3, QUANT_256, 3, 7),
-		uint4(QUANT_4, QUANT_256, 4, 7),
-		uint4(QUANT_5, QUANT_256, 5, 7),
-		uint4(QUANT_6, QUANT_256, 6, 7),
-		uint4(QUANT_8, QUANT_192, 8, 6),
-		uint4(QUANT_12, QUANT_96, 12, 5),
-		uint4(QUANT_16, QUANT_48, 16, 3),
-		uint4(QUANT_20, QUANT_32, 20, 2),
-		uint4(QUANT_24, QUANT_24, 24, 1),
-		uint4(QUANT_32, QUANT_12, 32, 0),
-	}
-};
-
-void choose_best_quantmethod(float4 texels[BLOCK_SIZE], float4 ep0, float4 ep1, out uint4 best_blockmode)
-{
-	float minerr = 1e31;
-
-	float projw[X_GRIDS * Y_GRIDS];
-	calculate_texelsweights(texels, ep0, ep1, projw);
-
-	for (int k = 0; k < BLOCK_MODE_NUM; ++k)
-	{
-		// encode
-#if HAS_ALPHA
-		uint4 blockmode = block_modes[1][k];
-#else
-		uint4 blockmode = block_modes[0][k];
-#endif
-
-		uint endpoints_quantized[8];
-		uint weights_quantized[X_GRIDS * Y_GRIDS];
-		encode_color(blockmode.w, ep0, ep1, endpoints_quantized);
-		quantize_weights(projw,	blockmode.z - 1, weights_quantized);
-
-		// decode
-		float4 decode_ep0 = 0;
-		float4 decode_ep1 = 0;
-		decode_color(blockmode.w, endpoints_quantized, decode_ep0, decode_ep1);
-		float sum = sumdiff_of_lerp_colors(texels, weights_quantized, blockmode.z - 1, decode_ep0, decode_ep1);
-		if (sum < minerr)
-		{
-			minerr = sum;
-			best_blockmode = blockmode;
-		}
-
-	}
-
-}
-#endif
 
 uint4 assemble_block(uint blockmode, uint color_endpoint_mode, uint partition_count, uint partition_index, uint4 ep_ise, uint4 wt_ise)
 {
@@ -724,23 +521,23 @@ uint4 encode_block(float4 texels[BLOCK_SIZE])
 	uint4 best_blockmode = uint4(QUANT_12, QUANT_256, 12, 7);
 #endif
 
-#if !FAST
-	choose_best_quantmethod(texels, ep0, ep1, best_blockmode);
-#endif
+//#if !FAST
+//	choose_best_quantmethod(texels, ep0, ep1, best_blockmode);
+//#endif
 
-	//uint weight_quantmethod = best_blockmode.x;
-	//uint endpoint_quantmethod = best_blockmode.y;
-	//uint weight_range = best_blockmode.z;
-	//uint colorquant_index = best_blockmode.w;
+	uint weight_quantmethod = best_blockmode.x;
+	uint endpoint_quantmethod = best_blockmode.y;
+	uint weight_range = best_blockmode.z;
+	uint colorquant_index = best_blockmode.w;
 
 	// reference to arm astc encoder "symbolic_to_physical"
 	//uint bytes_of_one_endpoint = 2 * (color_endpoint_mode >> 2) + 2;
 
-	uint blockmode = assemble_blockmode(best_blockmode.x);
+	uint blockmode = assemble_blockmode(weight_quantmethod);
 
-	uint4 ep_ise = endpoint_ise(best_blockmode.w, ep0, ep1, best_blockmode.y);
+	uint4 ep_ise = endpoint_ise(colorquant_index, ep0, ep1, endpoint_quantmethod);
 
-	uint4 wt_ise = weight_ise(texels, best_blockmode.z - 1, ep0, ep1, best_blockmode.x);
+	uint4 wt_ise = weight_ise(texels, weight_range - 1, ep0, ep1, weight_quantmethod);
 
 	// assemble to astcblock
 #if HAS_ALPHA
