@@ -2,7 +2,7 @@
 
 real time ASTC texture compression by computer shader 
 
-用d3d compute shader实时压缩astc纹理
+用d3d compute shader实时压缩astc纹理，实现的是ASTC的一个子集。
 
 ## Features
 
@@ -17,8 +17,6 @@ real time ASTC texture compression by computer shader
 - [d3d11](https://docs.microsoft.com/en-us/windows/win32/api/_direct3d11/)
 
 - [stb_image.h](https://github.com/nothings/stb/blob/master/stb_image.h) -   for image loading
-
-------
 
 ## Release
 
