@@ -2,12 +2,12 @@
 #define _WIN32_WINNT 0x600
 
 #include <string>
+#include <iostream>
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "dxguid.lib")
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -169,13 +169,20 @@ bool parse_cmd(int argc, char** argv, encode_option& option)
 int main(int argc, char** argv)
 {
 	if (argc < 2) {
+		std::cout << "wrong args count" << std::endl;
 		return -1;
 	}
 
 	encode_option option;
 	if (!parse_cmd(argc, argv, option)) {
+		std::cout << "wrong args options" << std::endl;
 		return -1;
 	}
+
+	std::cout << "encode option setting:\n"
+		<< "has_alpha\t" << std::boolalpha << option.has_alpha << std::endl
+		<< "is 4x4 block\t" << option.is4x4 << std::endl
+		<< "normal map\t" << option.is_normal_map << std::endl;
 
 	HWND hwnd = ::GetDesktopWindow();
 
@@ -185,6 +192,7 @@ int main(int argc, char** argv)
 	ID3D11DeviceContext* pDeviceContext = nullptr;
 	HRESULT hr = create_device_swapchain(hwnd, pSwapChain, pd3dDevice, pDeviceContext);
 	if (FAILED(hr))	{
+		std::cout << "init d3d failed!" << std::endl;
 		return hr;
 	}
 
@@ -192,6 +200,10 @@ int main(int argc, char** argv)
 
 	// shader resource view
 	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), !option.is_normal_map);
+	if (pSrcTexture == nullptr) {
+		std::cout << "load source texture failed! [" << src_tex << "]" << std::endl;
+		return -1;
+	}
 
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pSrcTexture->GetDesc(&TexDesc);
@@ -199,6 +211,10 @@ int main(int argc, char** argv)
 	int TexHeight = TexDesc.Height;
 
 	ID3D11Buffer* pOutBuf = encode_astc(pd3dDevice, pDeviceContext, pSrcTexture, option);
+	if (pOutBuf == nullptr) {
+		std::cout << "encode astc failed!" << std::endl;
+		return -1;
+	}
 
 	// save to file
 	D3D11_BUFFER_DESC sbDesc;
@@ -207,7 +223,11 @@ int main(int argc, char** argv)
 	uint32_t bufLen = sbDesc.ByteWidth;
 	uint8_t* pMemBuf = new uint8_t[bufLen];
 	ZeroMemory(pMemBuf, bufLen);
-	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+	hr = read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+	if (FAILED(hr)) {
+		std::cout << "save astc failed!" << std::endl;
+		return -1;
+	}
 
 	std::string dst_tex(src_tex);
 	strip_file_extension(dst_tex);
@@ -219,7 +239,7 @@ int main(int argc, char** argv)
 	delete[] pMemBuf;
 	pMemBuf = nullptr;
 
-	system("pause");
+	std::cout << "save astc to:" << dst_tex << std::endl;
 
 	return 0;
 

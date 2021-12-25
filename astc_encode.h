@@ -87,6 +87,7 @@ ID3D11Buffer* encode_astc(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pDevice
 	ID3DBlob * csBlob = nullptr;
 	HRESULT hr = compile_shader(L"ASTC_Encode.hlsl", "MainCS", "cs_5_0", option, pd3dDevice, &csBlob);
 	if (FAILED(hr)) {
+		std::cout << "compile shader failed!" << std::endl;
 		return nullptr;
 	}
 
