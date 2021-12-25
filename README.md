@@ -24,13 +24,15 @@ real time ASTC texture compression by computer shader
 
 ## Usage
 
+astc_cs_enc.exe  input_texture option_args
+
 | command parameter | valid value | explanation                    |
 | ----------------- | ----------- | ------------------------------ |
 | -4x4              | 1 or 0      | use format ASTC4x4，or ASTC6x6 |
 | -alpha            | 1 or 0      | does have alpha channel        |
 | -norm             | 1 or 0      | whether or not normal map      |
 
-## example
+ example
 
 ``` bash
 astc_cs_enc.exe ./textures/leaf.png -alpha 1 4x4 1
