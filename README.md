@@ -1,22 +1,41 @@
- real time ASTC texture compression by computer shader 
+## About
 
-用d3d compute shader实时压缩astc纹理，支持ASTC4x4  6x6，带alpha通道，法线贴图
+real time ASTC texture compression by computer shader 
 
-# 依赖
+用d3d compute shader实时压缩astc纹理
 
-- d3d11
+## Features
 
-- [Stbimage](https://github.com/nothings/stb) - for image loading
+- astc4x4
+- astc6x6
+- alpha channel
+- normal map
+- compress in linear space
 
-# 使用格式
+## Dependencies
 
-| 命令参数 | 可选值 | 作用                     |
-| -------- | ------ | ------------------------ |
-| -4x4     | 1 or 0 | 是否使用ASTC4x4，否则6x6 |
-| -alpha   | 1 or 0 | 是否有alpha通道          |
-| -norm    | 1 or 0 | 是否法线贴图             |
+- [d3d11](https://docs.microsoft.com/en-us/windows/win32/api/_direct3d11/)
 
-例子
+- [stb_image.h](https://github.com/nothings/stb/blob/master/stb_image.h) -   for image loading
 
+------
+
+## Release
+
+[astc_encoder v1.0](https://github.com/niepp/astc_encoder/releases/download/V1.0/astc_cs_enc.7z)
+
+## Usage
+
+| command parameter | valid value | explanation                    |
+| ----------------- | ----------- | ------------------------------ |
+| -4x4              | 1 or 0      | use format ASTC4x4，or ASTC6x6 |
+| -alpha            | 1 or 0      | does have alpha channel        |
+| -norm             | 1 or 0      | whether or not normal map      |
+
+## example
+
+``` bash
 astc_cs_enc.exe ./textures/leaf.png -alpha 1 4x4 1
+```
 
+see more https://niepp.github.io/2021/12/18/Compute-ASTC.html
