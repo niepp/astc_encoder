@@ -5,7 +5,7 @@ real time ASTC texture compression by computer shader
 用d3d compute shader实时压缩astc纹理，实现的是ASTC的一个子集。
 
 ## Features
-
+- texture compress in realtime
 - astc4x4
 - astc6x6
 - alpha channel
