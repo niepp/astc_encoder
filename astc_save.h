@@ -13,7 +13,6 @@ struct astc_header
 	uint8_t zsize[3];			// block count is inferred
 };
 
-
 //--------------------------------------------------------------------------------------
 // Create a CPU accessible buffer and download the content of a GPU buffer into it
 //-------------------------------------------------------------------------------------- 
@@ -26,8 +25,7 @@ ID3D11Buffer* create_and_copyto_cpu_buf(ID3D11Device* pd3dDevice, ID3D11DeviceCo
 	desc.Usage = D3D11_USAGE_STAGING;
 	desc.BindFlags = 0;
 	desc.MiscFlags = 0;
-	if (SUCCEEDED(pd3dDevice->CreateBuffer(&desc, nullptr, &pCpuBuf)))
-	{
+	if (SUCCEEDED(pd3dDevice->CreateBuffer(&desc, nullptr, &pCpuBuf))) {
 		pDeviceContext->CopyResource(pCpuBuf, pBuffer);
 	}
 	return pCpuBuf;
@@ -37,15 +35,13 @@ HRESULT read_gpu(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pDeviceContext, 
 {
 	HRESULT hr = S_OK;
 	ID3D11Buffer* pReadbackbuf = create_and_copyto_cpu_buf(pd3dDevice, pDeviceContext, pBuffer);
-	if (!pReadbackbuf)
-	{
+	if (!pReadbackbuf) {
 		return E_OUTOFMEMORY;
 	}
 
 	D3D11_MAPPED_SUBRESOURCE mappedSrc;
 	hr = pDeviceContext->Map(pReadbackbuf, 0, D3D11_MAP_READ, 0, &mappedSrc);
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		return hr;
 	}
 	memcpy(pMemBuf, mappedSrc.pData, buf_len);
@@ -53,8 +49,7 @@ HRESULT read_gpu(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pDeviceContext, 
 	return S_OK;
 }
 
-
-void save_astc(const char* astc_path, int xdim, int ydim, int xsize, int ysize, uint8_t* buffer)
+void save_astc(const char* astc_path, int xdim, int ydim, int xsize, int ysize, uint8_t* buffer, int bufsz)
 {
 	astc_header hdr;
 	hdr.magic[0] = MAGIC_FILE_CONSTANT & 0xFF;
@@ -74,13 +69,9 @@ void save_astc(const char* astc_path, int xdim, int ydim, int xsize, int ysize, 
 	hdr.zsize[1] = 0;
 	hdr.zsize[2] = 0;
 
-	int xblocks = (xsize + xdim - 1) / xdim;
-	int yblocks = (ysize + ydim - 1) / ydim;
-
 	FILE *wf = fopen(astc_path, "wb");
 	fwrite(&hdr, 1, sizeof(astc_header), wf);
-	fwrite(buffer, 1, xblocks * yblocks * 16, wf);
+	fwrite(buffer, 1, bufsz, wf);
 	fclose(wf);
-	free(buffer);
 }
 

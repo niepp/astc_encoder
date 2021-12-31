@@ -1,71 +1,28 @@
-#define WIDTH 1280
-#define HEIGHT 800
-
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x600
-#include <stdio.h>
+
 #include <string>
+#include <iostream>
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
-#include <directxmath.h>
-
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "dxguid.lib")
 
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "stb_image.h"
-#include "encode_astc.h"
-#include "save_astc.h"
 
-typedef struct _constantBufferStruct
-{
-	DirectX::XMFLOAT4X4 m;
-	DirectX::XMFLOAT4X4 vp;
-} ConstantBufferStruct;
+#include "astc_encode.h"
+#include "astc_save.h"
 
-
-typedef struct _vertexPositionColor
-{
-	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT2 uv;
-} VertexPositionColor;
-
-
-typedef struct  _renderDevice
-{
-	IDXGISwapChain* pSwapChain;
-	ID3D11Device* pd3dDevice;
-	ID3D11DeviceContext* pDeviceContext;
-	ID3D11RenderTargetView* pRenderTarget;
-	ID3D11DepthStencilView* pDepthStencilView;
-} RenderDevice;
-
-
-typedef struct _renderContext
-{
-	ID3D11VertexShader*      pVertexShader;
-	ID3D11PixelShader*       pPixelShader;
-	ID3D11Buffer*            pVertexConstantBuffer;
-	ID3D11Buffer*            pPixelConstantBuffer;
-	ID3D11InputLayout*       pInputLayout;
-	ID3D11Buffer*            pVertexBuffer;
-	ID3D11Buffer*            pIndexBuffer;
-	ID3D11RasterizerState*	 pRasterState;
-	int indexCount;
-} RenderContext;
-
-
-ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
+ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path, bool bSRGB)
 {
 	int xsize = 0;
 	int ysize = 0;
 	int components = 0;
 	stbi_uc* image = stbi_load(tex_path, &xsize, &ysize, &components, STBI_rgb_alpha);
-	if (image == nullptr)
-	{
+	if (image == nullptr) {
 		// if we haven't returned, it's because we failed to load the file.
 		printf("Failed to load image %s\nReason: %s\n", tex_path, stbi_failure_reason());
 		return nullptr;
@@ -77,7 +34,7 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 	TexDesc.Height = ysize;		// grid size of the waves, colums
 	TexDesc.MipLevels = 1;
 	TexDesc.ArraySize = 1;
-	TexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;	// SRGB?
+	TexDesc.Format = bSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
 	TexDesc.SampleDesc.Count = 1;
 	TexDesc.SampleDesc.Quality = 0;
 	TexDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -97,46 +54,18 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path)
 
 }
 
-
-HWND create_window(const char* window_title, int width, int height)
-{
-	const char class_name[] = "wndclass";
-	HINSTANCE instance = GetModuleHandle(nullptr);
-
-	// Register the window class
-	WNDCLASSEX wc = {
-		sizeof(WNDCLASSEX), CS_CLASSDC, DefWindowProc, 0, 0,
-		instance, nullptr, nullptr, nullptr, nullptr,
-		class_name, nullptr
-	};
-
-	RegisterClassEx(&wc);
-
-	// Create the application's window
-	DWORD style = WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | WS_SYSMENU;
-	HWND hwnd = CreateWindow(class_name, window_title,
-		style,
-		0, 0,
-		width, height,
-		nullptr, nullptr,
-		instance, nullptr);
-
-	return hwnd;
-
-}
-
-HRESULT create_device_swapchain(HWND hwnd, int width, int height, IDXGISwapChain*& pSwapChain, ID3D11Device*& pd3dDevice, ID3D11DeviceContext*& pDeviceContext)
+HRESULT create_device_swapchain(HWND hwnd, IDXGISwapChain*& pSwapChain, ID3D11Device*& pd3dDevice, ID3D11DeviceContext*& pDeviceContext)
 {
 	DXGI_SWAP_CHAIN_DESC desc;
 	ZeroMemory(&desc, sizeof(DXGI_SWAP_CHAIN_DESC));
-	desc.BufferDesc.Width = width;
-	desc.BufferDesc.Height = height;
+	desc.BufferDesc.Width = 800;
+	desc.BufferDesc.Height = 600;
 	desc.BufferDesc.RefreshRate.Denominator = 0;
 	desc.BufferDesc.RefreshRate.Numerator = 0;
 	desc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	desc.SampleDesc.Count = 1;      //multisampling setting
 	desc.SampleDesc.Quality = 0;    //vendor-specific flag
-	desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;		//DXGI_USAGE_UNORDERED_ACCESS;
+	desc.BufferUsage = DXGI_USAGE_UNORDERED_ACCESS;		//DXGI_USAGE_UNORDERED_ACCESS;
 	desc.BufferCount = 1;
 	desc.OutputWindow = hwnd;
 	desc.Windowed = TRUE;
@@ -207,52 +136,110 @@ void strip_file_extension(std::string &file_path)
 	}
 }
 
+bool parse_cmd(int argc, char** argv, encode_option& option)
+{
+	auto func_arg_value = [](int index, int argc, char** argv, bool &ret) -> bool {
+		if (index < argc && std::isdigit(*(argv[index])) > 0) {
+			ret = (argv[index] != std::string("0"));
+			return true;
+		}
+		return false;
+	};
+
+	for (int i = 2; i < argc; ++i) {
+		if (argv[i] == std::string("-4x4")) {
+			if (!func_arg_value(i + 1, argc, argv, option.is4x4)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-norm")) {
+			if (!func_arg_value(i + 1, argc, argv, option.is_normal_map)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-alpha")) {
+			if (!func_arg_value(i + 1, argc, argv, option.has_alpha)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 int main(int argc, char** argv)
 {
-	if (argc < 1) {
+	if (argc < 2) {
+		std::cout << "wrong args count" << std::endl;
 		return -1;
 	}
 
-	const int cFrameRate = 30;
-	const int cWidth = 1280;
-	const int cHeight = 800;
+	encode_option option;
+	if (!parse_cmd(argc, argv, option)) {
+		std::cout << "wrong args options" << std::endl;
+		return -1;
+	}
 
-	const int cBlockDimX = 4;
-	const int cBlockDimY = 4;
-	const int cNumthreadX = 8; // same to compute shader [numthreads(8, 8, 1)]
-	const int cNumthreadY = 8;
+	std::cout << "encode option setting:\n"
+		<< "has_alpha\t" << std::boolalpha << option.has_alpha << std::endl
+		<< "is 4x4 block\t" << option.is4x4 << std::endl
+		<< "normal map\t" << option.is_normal_map << std::endl;
 
-	HWND hwnd = create_window("cs", cWidth, cHeight);
+	HWND hwnd = ::GetDesktopWindow();
 
 	// setting up device
 	IDXGISwapChain* pSwapChain = nullptr;
 	ID3D11Device* pd3dDevice = nullptr;
 	ID3D11DeviceContext* pDeviceContext = nullptr;
-	HRESULT hr = create_device_swapchain(hwnd, cWidth, cHeight, pSwapChain, pd3dDevice, pDeviceContext);
+	HRESULT hr = create_device_swapchain(hwnd, pSwapChain, pd3dDevice, pDeviceContext);
 	if (FAILED(hr))	{
+		std::cout << "init d3d failed!" << std::endl;
 		return hr;
 	}
 
-	std::string src_tex = argv[0];
-	
+	std::string src_tex = argv[1];
+
 	// shader resource view
-	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str());
+	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), !option.is_normal_map);
+	if (pSrcTexture == nullptr) {
+		std::cout << "load source texture failed! [" << src_tex << "]" << std::endl;
+		return -1;
+	}
 
 	D3D11_TEXTURE2D_DESC TexDesc;
 	pSrcTexture->GetDesc(&TexDesc);
+	int TexWidth = TexDesc.Width;
+	int TexHeight = TexDesc.Height;
 
-	ID3D11Buffer* pOutBuf = encode_astc(pSwapChain, pd3dDevice, pDeviceContext, pSrcTexture);
+	ID3D11Buffer* pOutBuf = encode_astc(pd3dDevice, pDeviceContext, pSrcTexture, option);
+	if (pOutBuf == nullptr) {
+		std::cout << "encode astc failed!" << std::endl;
+		return -1;
+	}
 
 	// save to file
-	uint32_t bufLen = 16 * ((TexDesc.Height + cBlockDimY - 1) / cBlockDimY) * ((TexDesc.Width + cBlockDimX - 1) / cBlockDimX);
+	D3D11_BUFFER_DESC sbDesc;
+	pOutBuf->GetDesc(&sbDesc);
+
+	uint32_t bufLen = sbDesc.ByteWidth;
 	uint8_t* pMemBuf = new uint8_t[bufLen];
 	ZeroMemory(pMemBuf, bufLen);
-	read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+	hr = read_gpu(pd3dDevice, pDeviceContext, pOutBuf, pMemBuf, bufLen);
+	if (FAILED(hr)) {
+		std::cout << "save astc failed!" << std::endl;
+		return -1;
+	}
 
-	std::string dst_tex = src_tex;
+	std::string dst_tex(src_tex);
 	strip_file_extension(dst_tex);
 	dst_tex += ".astc";
-	save_astc(dst_tex.c_str(), cBlockDimX, cBlockDimX, TexDesc.Width, TexDesc.Height, pMemBuf);
+
+	int DimSize = option.is4x4 ? 4 : 6;
+	save_astc(dst_tex.c_str(), DimSize, DimSize, TexDesc.Width, TexDesc.Height, pMemBuf, bufLen);
+
+	delete[] pMemBuf;
+	pMemBuf = nullptr;
+
+	std::cout << "save astc to:" << dst_tex << std::endl;
 
 	return 0;
 
