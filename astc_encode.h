@@ -14,11 +14,15 @@
 struct encode_option
 {
 	bool is4x4;
+	bool is6x6;
 	bool is_normal_map;
 	bool has_alpha;
+	bool srgb;
 	encode_option() : is4x4(true)
+		, is6x6(false)
 		, is_normal_map(false)
 		, has_alpha(false)
+		, srgb(false)
 	{
 	}
 };

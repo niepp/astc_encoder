@@ -21,6 +21,7 @@ ID3D11Texture2D* load_tex(ID3D11Device* pd3dDevice, const char* tex_path, bool b
 	int xsize = 0;
 	int ysize = 0;
 	int components = 0;
+	stbi_set_flip_vertically_on_load(1);
 	stbi_uc* image = stbi_load(tex_path, &xsize, &ysize, &components, STBI_rgb_alpha);
 	if (image == nullptr) {
 		// if we haven't returned, it's because we failed to load the file.
@@ -139,8 +140,8 @@ void strip_file_extension(std::string &file_path)
 bool parse_cmd(int argc, char** argv, encode_option& option)
 {
 	auto func_arg_value = [](int index, int argc, char** argv, bool &ret) -> bool {
-		if (index < argc && std::isdigit(*(argv[index])) > 0) {
-			ret = (argv[index] != std::string("0"));
+		if (index < argc && *(argv[index]) == '-') {
+			ret = true;
 			return true;
 		}
 		return false;
@@ -148,17 +149,27 @@ bool parse_cmd(int argc, char** argv, encode_option& option)
 
 	for (int i = 2; i < argc; ++i) {
 		if (argv[i] == std::string("-4x4")) {
-			if (!func_arg_value(i + 1, argc, argv, option.is4x4)) {
+			if (!func_arg_value(i, argc, argv, option.is4x4)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-6x6")) {
+			if (!func_arg_value(i, argc, argv, option.is6x6)) {
 				return false;
 			}
 		}
 		else if (argv[i] == std::string("-norm")) {
-			if (!func_arg_value(i + 1, argc, argv, option.is_normal_map)) {
+			if (!func_arg_value(i, argc, argv, option.is_normal_map)) {
+				return false;
+			}
+		}
+		else if (argv[i] == std::string("-srgb")) {
+			if (!func_arg_value(i, argc, argv, option.srgb)) {
 				return false;
 			}
 		}
 		else if (argv[i] == std::string("-alpha")) {
-			if (!func_arg_value(i + 1, argc, argv, option.has_alpha)) {
+			if (!func_arg_value(i, argc, argv, option.has_alpha)) {
 				return false;
 			}
 		}
@@ -182,7 +193,8 @@ int main(int argc, char** argv)
 	std::cout << "encode option setting:\n"
 		<< "has_alpha\t" << std::boolalpha << option.has_alpha << std::endl
 		<< "is 4x4 block\t" << option.is4x4 << std::endl
-		<< "normal map\t" << option.is_normal_map << std::endl;
+		<< "normal map\t" << option.is_normal_map << std::endl
+		<< "encode in gamma color space\t" << option.srgb << std::endl;
 
 	HWND hwnd = ::GetDesktopWindow();
 
@@ -199,7 +211,7 @@ int main(int argc, char** argv)
 	std::string src_tex = argv[1];
 
 	// shader resource view
-	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), !option.is_normal_map);
+	ID3D11Texture2D* pSrcTexture = load_tex(pd3dDevice, src_tex.c_str(), option.srgb && (!option.is_normal_map));
 	if (pSrcTexture == nullptr) {
 		std::cout << "load source texture failed! [" << src_tex << "]" << std::endl;
 		return -1;
