@@ -20,7 +20,7 @@ real time ASTC texture compression by computer shader
 
 ## Release
 
-[astc_encoder v1.0](https://github.com/niepp/astc_encoder/releases/download/V1.0/astc_cs_enc.7z)
+[astc_encoder v1.0](https://github.com/niepp/astc_encoder/releases/download/V1.0/astc_encoder.7z)
 
 ## Usage
 
